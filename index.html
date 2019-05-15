@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Game Maker Tilemap collision</title>
+    <meta charset="utf-8">
+    <style type="text/css">
+        body {
+            background-color: #f5f2ec;
+            margin-bottom: 100px;
+            font-family: sans-serif;
+            color: #333333;
+        }
+        .caption {
+            position: fixed;
+            bottom: 0;
+            right: 0;
+            left: 0;
+            box-shadow: 0 0 5px 5px #cbcbcb;
+            background-color: #f4e9dc;
+            padding: 5px;
+        }
+        .caption>div {
+            display: inline-block;
+            margin-right: 15px;
+        }
+        .use-case {
+            display: flex;
+            flex-wrap: wrap;
+            border-bottom: 1px solid #cbcbcb;
+            padding-top: 10px;
+            padding-bottom: 10px;
+        }
+        .use-case>div {
+            width: 100%;
+        }
+        .report-status {
+            font-size: 1.8rem;
+            font-weight: bold;
+            text-align: center;
+        }
+        .success {
+            color: #4be12d;
+        }
+        .fail {
+            color: #eb1c1c;
+        }
+        .canvas-container {
+            text-align: center;
+            overflow-x: auto;
+        }
+        footer {
+            padding: 20px;
+            text-align: right;
+        }
+        @media only screen and (min-width: 1080px) {
+            .caption {
+                left: 50%;
+                right: auto;
+            }
+            .use-case>div {
+                width: 50%;
+            }
+            .report {
+                position: relative;
+            }
+            .report-status {
+                text-align: right;
+                position: absolute;
+                bottom: 0;
+                right: 20px;
+            }
+            .canvas-container {
+                text-align: left;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<h1>GameMaker Tilemap Collision Use Cases</h1>
+
+<p>
+    Some usecases to show why the collision detection from <a href="https://www.youtube.com/watch?v=UyKdQQ3UR_0">this tutorial</a> is not working.
+    <br>
+    The fix by Tom Cheshire from comments is implemented and solved some use cases but it is still not fully efficient.
+</p>
+
+<div id="useCases"></div>
+
+<div class="caption">
+    <div>
+        <span>Start</span> <canvas id="playerCaptionCanvas"></canvas>
+    </div>
+    <div>
+        <span>Tried</span> <canvas id="triedCaptionCanvas"></canvas>
+    </div>
+    <div>
+        <span>Expected</span> <canvas id="expectedCaptionCanvas"></canvas>
+    </div>
+    <div>
+        <span>Final</span> <canvas id="finalCaptionCanvas"></canvas>
+    </div>
+    <div>
+        <span>Collision Tile</span> <canvas id="collisionTileCaptionCanvas"></canvas>
+    </div>
+</div>
+
+<footer>By Benjamin Hacques</footer>
+
+
+<script type="application/javascript">
+
+var tile_size = 64;
+var ground_tile_map = 'Collisions'; // just to get a parameter like the GML tilemap_get_at_pixel function
+
+var use_case_count = 0; // the use case number for debug purpose
+
+/**
+ * The player need to move. He knows the direction, we must find if there is no collision tile on his way.
+ * This function is meant to be use as a script in GameMaker using GML so you can only use the parameters.
+ * @param {int} x - Current player x.
+ * @param {int} y - Current player y.
+ * @param {int} xx - Delta between current x and where the player tries to go.
+ * @param {int} yy - Delta between current y and where the player tries to go.
+ * @param {int} bbox_left - X coordinate of the left side of the bbox.
+ * @param {int} bbox_top - Y coordinate of the top side of the bbox.
+ * @param {int} bbox_right - X coordinate of the right side of the bbox.
+ * @param {int} bbox_bottom - Y coordinate of the bottom side of the bbox.
+ * @param {function(any, int, int):int} tilemap_get_at_pixel - Same as GameMaker's one.
+ *     Parameters are :
+ *         {any} tilemap_element_id - Useless in this js script but we keep the same parameters as GML tilemap_get_at_pixel().
+ *         {int} x
+ *         {int} y
+ *     Return value is 1 if there is a tile at these coordinates else 0.
+ * @returns {number[]} - Valid new position after collision check. Like this : [valid_x, valid_y]
+ */
+function getValidPosition(x, y, xx, yy, bbox_left, bbox_top, bbox_right, bbox_bottom, tilemap_get_at_pixel, tile_size) {
+
+    // if (use_case_count == 2) console.log(xx);
+
+    // https://www.youtube.com/watch?v=UyKdQQ3UR_0
+    // [JS ONLY] : rename variables like the vid
+    var initial_x = x;
+    var initial_y = y;
+    var hsp = xx;
+    var vsp = yy;
+    var tilemap = ground_tile_map;
+
+    var bbox_side;
+
+    //Horizontal Collision
+    if (hsp > 0) bbox_side = bbox_right; else bbox_side = bbox_left;
+    if ((tilemap_get_at_pixel(tilemap, bbox_side+hsp, bbox_top) != 0) || (tilemap_get_at_pixel(tilemap, bbox_side+hsp, bbox_bottom) != 0))
+    {
+        if (hsp > 0) x = x - (x % tile_size) + (tile_size-1) - (bbox_right - x);
+        else x = x - (x % tile_size) - (bbox_left - x);
+        hsp = 0;
+    }
+    x += hsp;
+
+    // [JS ONLY] : x has changed so we need to update bbox_right and bbox_left like GameMaker does
+    bbox_left += x - initial_x;
+    bbox_right += x - initial_x;
+
+    //Vertical Collision
+    if (vsp > 0) bbox_side = bbox_bottom; else bbox_side = bbox_top;
+    if ((tilemap_get_at_pixel(tilemap, bbox_left, bbox_side+vsp) != 0) || (tilemap_get_at_pixel(tilemap, bbox_right, bbox_side+vsp) != 0))
+    {
+        // from the video
+        //if (vsp > 0) y = y - (y % tile_size) + (tile_size-1) - (bbox_right - y);
+        // the fix by Tom Cheshire in the comments
+        if (vsp > 0) y = y - (bbox_bottom % tile_size) + (tile_size-1);
+        else y = y - (y % tile_size) - (bbox_left - y);
+        vsp = 0;
+    }
+    y += vsp;
+
+    // y has changed, update bbox_top and bbox_bottom if you want to continue
+
+    return [x, y];
+}
+
+/**
+ * All use cases.
+ */
+function test() {
+
+    addUseCase(
+        makePlayerFromTopLeft(64, 64),
+        [],
+        makePlayerFromTopLeft(192, 192),
+        makePlayerFromTopLeft(192, 192),
+        'No obstacle'
+    );
+
+    var ground_tile = findTile(2,2);
+    addUseCase(
+        makePlayerFromBottomLeft(ground_tile.x_min + 5, ground_tile.y_min - 3),
+        [ground_tile],
+        makePlayerFromBottomLeft(ground_tile.x_min + 10, ground_tile.y_min + 3),
+        makePlayerFromBottomLeft(ground_tile.x_min + 10, ground_tile.y_min - 1),
+        'Simple ground collision'
+    );
+
+    var wall_tile = findTile(3,2);
+    addUseCase(
+        makePlayerFromTopRight(wall_tile.x_min - 5, wall_tile.y_min + 5),
+        [wall_tile],
+        makePlayerFromTopRight(wall_tile.x_min + 5, wall_tile.y_min + 10),
+        makePlayerFromTopRight(wall_tile.x_min -1, wall_tile.y_min + 10),
+        'Simple wall collision'
+    );
+
+    var corner_tile = findTile(3,3);
+    addUseCase(
+        makePlayerFromBottomRight(corner_tile.x_min - 5, corner_tile.y_min - 5),
+        [corner_tile, findTile(2,3), findTile(3,2)],
+        makePlayerFromBottomRight(corner_tile.x_min + 5, corner_tile.y_min + 5),
+        makePlayerFromBottomRight(corner_tile.x_min - 1, corner_tile.y_min - 1),
+        'Simple corner collision'
+    );
+
+    var collision_tile = findTile(2,1);
+    var player_start = makePlayerFromTopRight(collision_tile.x_min - 9, collision_tile.y_max - 12);
+    var player_tried = makePlayerFromTopRight(collision_tile.x_min + 10, collision_tile.y_max + 6);
+    var expected_x = collision_tile.x_min - 1;
+    var expected_y = (player_start.bbox_top + player_tried.bbox_top) / ((player_start.bbox_right + player_tried.bbox_right) / expected_x);
+    var player_expected = makePlayerFromTopRight(expected_x, expected_y);
+    addUseCase(
+        player_start,
+        [collision_tile],
+        player_tried,
+        player_expected,
+        'Simple path collision'
+    );
+
+
+
+    var ground_tile = findTile(2,2);
+    addUseCase(
+        makePlayerFromBottomLeft(ground_tile.x_min + 5, ground_tile.y_min - 30),
+        [ground_tile],
+        makePlayerFromTopRight(ground_tile.x_max - 5, ground_tile.y_min + 30),
+        makePlayerFromBottomRight(ground_tile.x_max - 5, ground_tile.y_min - 1),
+        'Hight speed ground collision'
+    );
+
+    var ground_tile = findTile(3,2);
+    addUseCase(
+        makePlayerFromTopRight(ground_tile.x_min - 30, ground_tile.y_min - 5),
+        [ground_tile],
+        makePlayerFromTopLeft(ground_tile.x_min + 30, ground_tile.y_min + 30),
+        makePlayerFromTopRight(ground_tile.x_min - 1, ground_tile.y_min + 30),
+        'Hight speed wall collision'
+    );
+
+    var ground_tile = findTile(3,3);
+    addUseCase(
+        makePlayerFromBottomRight(ground_tile.x_min - 50, ground_tile.y_min - 20),
+        [ground_tile, findTile(1,3), findTile(2,3), findTile(3,2)],
+        makePlayerFromTopLeft(ground_tile.x_min + 30, ground_tile.y_min + 30),
+        makePlayerFromBottomRight(ground_tile.x_min - 1, ground_tile.y_min - 1),
+        'Hight speed ground and wall collision'
+    );
+}
+
+
+
+
+
+
+// #####################################################################
+// ################## Use Case Functions ###############################
+// #####################################################################
+
+/**
+ * Add a use case to test.
+ * @param {Player} player - The player starting state 
+ * @param {Tile[]} collision_tiles - Some collision tiles
+ * @param {(Player|Position)} tried_position - Where the player tries to go. You can use a Position or a Player. Only x and y are used.
+ * @param {(Player|Position)} expected_position - Where the player should be after the collision check.
+ * @param {string} description
+ */
+function addUseCase(player, collision_tiles, tried_position, expected_position, description = '') {
+    use_case_count++;
+
+    var res = _testScript(player, collision_tiles, tried_position);
+
+    var final_position = new Position(res.final_pos_arr[0], res.final_pos_arr[1]);
+
+    var is_success = _isSamePosition(final_position, expected_position);
+
+    _drawUseCase(player, collision_tiles, tried_position, expected_position, final_position, is_success, res.tilemap_get_at_pixel_call, description);
+}
+
+/**
+ * Player object
+ */
+function Player(x, y, bbox_left, bbox_top, bbox_right, bbox_bottom) {
+    this.x = x;
+    this.y = y;
+    this.bbox_left = bbox_left;
+    this.bbox_top = bbox_top;
+    this.bbox_right = bbox_right;
+    this.bbox_bottom = bbox_bottom;
+
+    this.width = this.bbox_right - this.bbox_left;
+    this.height = this.bbox_bottom - this.bbox_top;
+}
+
+/**
+ * Let say the player looks like this :
+ * ---------
+ * |       |
+ * |       |
+ * |       |
+ * |   *   |
+ * ---------
+ * Where the "*" is the origin (x, y) and the rectangle is the bbox.
+ * You can get it from one of his corner. With one of the following functions.
+ * @param {number} corner_x
+ * @param {number} corner_y
+ * @param {number} bbox_width
+ * @param {number} bbox_height
+ * @returns {Player}
+ */
+function makePlayerFromTopLeft(bbox_top_left_corner_x, bbox_top_left_corner_y, bbox_width = 32, bbox_height = 48) {
+    return new Player(
+        bbox_top_left_corner_x + Math.round(bbox_width/2),
+        bbox_top_left_corner_y + Math.round(bbox_height/1.25),
+        bbox_top_left_corner_x,
+        bbox_top_left_corner_y,
+        bbox_top_left_corner_x + bbox_width,
+        bbox_top_left_corner_y + bbox_height
+    );
+}
+function makePlayerFromTopRight(bbox_top_right_corner_x, bbox_top_right_corner_y, bbox_width = 32, bbox_height = 48) {
+    return new Player(
+        bbox_top_right_corner_x - Math.round(bbox_width/2),
+        bbox_top_right_corner_y + Math.round(bbox_height/1.25),
+        bbox_top_right_corner_x - bbox_width,
+        bbox_top_right_corner_y,
+        bbox_top_right_corner_x,
+        bbox_top_right_corner_y + bbox_height
+    );
+}
+function makePlayerFromBottomLeft(bbox_bottom_left_corner_x, bbox_bottom_left_corner_y, bbox_width = 32, bbox_height = 48) {
+    return new Player(
+        bbox_bottom_left_corner_x + Math.round(bbox_width/2),
+        bbox_bottom_left_corner_y - bbox_height + Math.round(bbox_height/1.25),
+        bbox_bottom_left_corner_x,
+        bbox_bottom_left_corner_y - bbox_height,
+        bbox_bottom_left_corner_x + bbox_width,
+        bbox_bottom_left_corner_y
+    );
+}
+function makePlayerFromBottomRight(bbox_bottom_right_corner_x, bbox_bottom_right_corner_y, bbox_width = 32, bbox_height = 48) {
+    return new Player(
+        bbox_bottom_right_corner_x - Math.round(bbox_width/2),
+        bbox_bottom_right_corner_y - bbox_height + Math.round(bbox_height/1.25),
+        bbox_bottom_right_corner_x - bbox_width,
+        bbox_bottom_right_corner_y - bbox_height,
+        bbox_bottom_right_corner_x,
+        bbox_bottom_right_corner_y
+    );
+}
+
+/**
+ * A Tile.
+ * Use findTile() to get a proper tile.
+ */
+function Tile(x_min, x_max, y_min, y_max) {
+    this.x_min = x_min;
+    this.x_max = x_max;
+    this.y_min = y_min;
+    this.y_max = y_max;
+    this.width = this.x_max - this.x_min;
+    this.height = this.x_max - this.x_min;
+}
+
+/**
+ * Get a tile by its position on the grid. The top left tile is (0,0), right to it is (1,0), under this one is (1,1) etc.
+ */
+function findTile(horizontal_nb, vertical_nb) {
+    var x_min = horizontal_nb * tile_size;
+    var y_min = vertical_nb * tile_size;
+    return new Tile(x_min, x_min + tile_size, y_min, y_min + tile_size);
+}
+
+function Position(x, y) {
+    this.x = x;
+    this.y = y;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+// #####################################################################
+// ################## Private Functions ###############################
+// #####################################################################
+
+/**
+ * Run getValidPosition()
+ */
+function _testScript(player, collision_tiles, tried_position) {
+    var tilemap_get_at_pixel_call = 0;
+    var tilemap_get_at_pixel = function(ground_tile_map, x, y) {
+        tilemap_get_at_pixel_call++;
+        var res = collision_tiles.find((tile) => {
+            if (x >= tile.x_min && x <= tile.x_max &&
+                y >= tile.y_min && y <= tile.y_max) {
+                return true; // colliding
+            }
+            return false;
+        });
+        return res ? 1 : 0; // 1 is the id of the collision tile in the tilemap in GameMaker
+    }
+    var final_pos_arr = getValidPosition(player.x, player.y, tried_position.x - player.x, tried_position.y - player.y, player.bbox_left, player.bbox_top, player.bbox_right, player.bbox_bottom, tilemap_get_at_pixel, tile_size);
+    return {final_pos_arr: final_pos_arr, tilemap_get_at_pixel_call: tilemap_get_at_pixel_call};
+}
+
+function _drawUseCase(player, collision_tiles, tried_position, expected_position, final_position, is_success, tilemap_get_at_pixel_call, description = '') {
+
+    // get Players from Positions
+    var tried_player = _getPlayerAt(player, tried_position);
+    var expected_player = _getPlayerAt(player, expected_position);
+    var final_player = _getPlayerAt(player, final_position);
+
+    var margin = 20;
+    var status_line_width = 5;
+
+    var container = document.createElement('div');
+    container.appendChild(_getReport(player, collision_tiles, tried_player, expected_player, final_player, is_success, tilemap_get_at_pixel_call, description));
+
+    container.className = 'use-case';
+    var canvas = document.createElement('canvas');
+
+    var bounds = this._getBounds(player, collision_tiles, tried_player, expected_player, final_player);
+
+    // center (square canvas only)
+    var bounds_width = bounds.x_max - bounds.x_min;
+    var bounds_height = bounds.y_max - bounds.y_min;
+    if (bounds_width > bounds_height) {
+        // vertical
+        bounds = _boundsAddMargin(bounds, 0, (bounds_width - bounds_height) / 2);
+    } else {
+        // horizontal
+        bounds = _boundsAddMargin(bounds, (bounds_height - bounds_width) / 2, 0);
+    }
+
+    // some margins
+    bounds = _boundsAddMargin(bounds, margin, margin);
+
+    scale = _canvas_size / Math.max(bounds.x_max - bounds.x_min, bounds.y_max - bounds.y_min);
+
+    canvas.setAttribute('width', _canvas_size);
+    canvas.setAttribute('height', _canvas_size);
+    var canvas_container = document.createElement('div');
+    canvas_container.className = 'canvas-container';
+    canvas_container.appendChild(canvas);
+    container.appendChild(canvas_container);
+    document.getElementById('useCases').appendChild(container);
+
+    var ctx = canvas.getContext('2d');
+
+    ctx.scale(scale, scale);
+    ctx.translate(-bounds.x_min, -bounds.y_min);
+
+    var canvas_bounds = new _Bounds(
+        bounds.x_min,
+        bounds.x_min + (_canvas_size/scale),
+        bounds.y_min,
+        bounds.y_min + (_canvas_size/scale)
+    );
+
+    // status border
+    ctx.strokeStyle = is_success ? _success_color : _fail_color;
+    ctx.lineWidth = status_line_width;
+    ctx.strokeRect(canvas_bounds.x_min, canvas_bounds.y_min, canvas_bounds.x_max - canvas_bounds.x_min, canvas_bounds.y_max - canvas_bounds.y_min);
+
+    ctx.lineWidth = 1;
+
+    // grid
+    grid_bounds = new _Bounds(
+        canvas_bounds.x_min + status_line_width,
+        canvas_bounds.x_max - status_line_width,
+        canvas_bounds.y_min + status_line_width,
+        canvas_bounds.y_max - status_line_width
+    );
+    var font_size = Math.ceil(10 / scale);
+    ctx.font = font_size + 'px sans-serif';
+    ctx.fillStyle = _coord_font_color;
+    ctx.textAlign = 'left';
+    // vertical
+    ctx.strokeStyle = _grid_color;
+    var grid_x = grid_bounds.x_min - (grid_bounds.x_min % tile_size) + tile_size;
+    var max_grid_x = grid_bounds.x_max - (grid_bounds.x_max % tile_size);
+    for (grid_x; grid_x <= max_grid_x; grid_x += tile_size) {
+        ctx.fillText(grid_x, grid_x + 1, grid_bounds.y_min + font_size);
+        ctx.globalAlpha = 0.3;
+        _drawLine(ctx, new Position(grid_x, grid_bounds.y_min), new Position(grid_x, grid_bounds.y_max));
+        ctx.globalAlpha = 1;
+    }
+    // horizontal
+    var grid_y = grid_bounds.y_min - (grid_bounds.y_min % tile_size) + tile_size;
+    var max_grid_y = grid_bounds.y_max - (grid_bounds.y_max % tile_size);
+    for (grid_y; grid_y <= max_grid_y; grid_y += tile_size) {
+        ctx.fillText(grid_y, grid_bounds.x_min, grid_y + font_size);
+        ctx.globalAlpha = 0.3;
+        _drawLine(ctx, new Position(grid_bounds.x_min, grid_y), new Position(grid_bounds.x_max, grid_y));
+        ctx.globalAlpha = 1;
+    }
+
+    // collision tiles
+    ctx.strokeStyle = _collision_tile_color;
+    ctx.globalAlpha = 0.5;
+    collision_tiles.forEach((tile) => {
+        ctx.strokeRect(tile.x_min, tile.y_min, tile.width, tile.height);
+        _drawLine(ctx, new Position(tile.x_min, tile.y_min), new Position(tile.x_max, tile.y_max));
+        _drawLine(ctx, new Position(tile.x_max, tile.y_min), new Position(tile.x_min, tile.y_max));
+    });
+    ctx.globalAlpha = 1;
+
+    var final_is_tried = _isSamePosition(final_player, tried_player);
+
+    // player start
+    ctx.strokeStyle = _player_color;
+    _drawPlayer(ctx, player);
+
+    if (!final_is_tried) {
+        // player tried
+        ctx.strokeStyle = _tried_position_color;
+        _drawPathBetweenPlayers(ctx, player, tried_player);
+        _drawPlayer(ctx, tried_player);
+    }
+
+    // player expected
+    ctx.strokeStyle = _expected_position_color;
+    _drawPathBetweenPlayers(ctx, player, expected_player);
+    _drawPlayer(ctx, expected_player);
+
+    if (!is_success) {
+        // player end
+        ctx.strokeStyle = _final_position_color;
+        _drawPathBetweenPlayers(ctx, player, final_player);
+        _drawPlayer(ctx, final_player);
+    }
+}
+
+function _boundsAddMargin(bounds, mx, my) {
+    return new _Bounds(
+        bounds.x_min - mx,
+        bounds.x_max + mx,
+        bounds.y_min - my,
+        bounds.y_max + my
+    );
+}
+
+function _drawPlayer(ctx, player) {
+    ctx.strokeRect(player.bbox_left, player.bbox_top, player.width, player.height);
+    _drawXY(ctx, player.x, player.y);
+}
+
+function _drawPathBetweenPlayers(ctx, player1, player2) {
+    ctx.setLineDash([5, 15]);
+    ctx.globalAlpha = 0.3;
+    if (player1.bbox_left < player2.bbox_left && player1.bbox_top >= player2.bbox_top || player1.bbox_left >= player2.bbox_left && player1.bbox_top < player2.bbox_top)
+        _drawLine(ctx, new Position(player1.bbox_left, player1.bbox_top), new Position(player2.bbox_left, player2.bbox_top));
+    if (player1.bbox_right <= player2.bbox_right && player1.bbox_top < player2.bbox_top || player1.bbox_right > player2.bbox_right && player1.bbox_top >= player2.bbox_top)
+        _drawLine(ctx, new Position(player1.bbox_right, player1.bbox_top), new Position(player2.bbox_right, player2.bbox_top));
+    if (player1.bbox_left > player2.bbox_left && player1.bbox_bottom >= player2.bbox_bottom || player1.bbox_left <= player2.bbox_left && player1.bbox_bottom < player2.bbox_bottom)
+        _drawLine(ctx, new Position(player1.bbox_left, player1.bbox_bottom), new Position(player2.bbox_left, player2.bbox_bottom));
+    if (player1.bbox_right >= player2.bbox_right && player1.bbox_bottom < player2.bbox_bottom || player1.bbox_right < player2.bbox_right && player1.bbox_bottom >= player2.bbox_bottom)
+        _drawLine(ctx, new Position(player1.bbox_right, player1.bbox_bottom), new Position(player2.bbox_right, player2.bbox_bottom));
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+}
+
+function _drawXY(ctx, x, y) {
+    _drawLine(ctx, new Position(x, y-2), new Position(x, y+2));
+    _drawLine(ctx, new Position(x-2, y), new Position(x+2, y));
+}
+
+function _drawLine(ctx, startCoord, endCoord) {
+    ctx.beginPath();
+    ctx.moveTo(startCoord.x, startCoord.y);
+    ctx.lineTo(endCoord.x, endCoord.y);
+    ctx.closePath();
+    ctx.stroke();
+}
+
+function _getPlayerAt(player, position) {
+    return new Player(
+        position.x,
+        position.y,
+        position.x - (player.x - player.bbox_left),
+        position.y - (player.y - player.bbox_top),
+        position.x + (player.bbox_right - player.x),
+        position.y + (player.bbox_bottom - player.y)
+    );
+}
+
+function _getBounds(player, collision_tiles, tried_player, expected_player, final_player) {
+
+    var bounds = _playerToBounds(player);
+
+    /*collision_tiles.forEach((tile) => {
+        bounds = _mergeBounds(bounds, new _Bounds(
+            tile.x_min,
+            tile.x_max,
+            tile.y_min,
+            tile.y_max
+        ));
+    });*/
+
+    bounds = _mergeBounds(bounds, _playerToBounds(tried_player));
+    bounds = _mergeBounds(bounds, _playerToBounds(expected_player));
+    bounds = _mergeBounds(bounds, _playerToBounds(final_player));
+
+    return bounds;
+}
+
+function _playerToBounds(player) {
+    return new _Bounds(player.bbox_left, player.bbox_right, player.bbox_top, player.bbox_bottom);
+}
+
+function _mergeBounds(bounds1, bounds2) {
+    return new _Bounds(
+        Math.min(bounds1.x_min, bounds2.x_min),
+        Math.max(bounds1.x_max, bounds2.x_max),
+        Math.min(bounds1.y_min, bounds2.y_min),
+        Math.max(bounds1.y_max, bounds2.y_max)
+    );
+}
+
+function _Bounds(x_min, x_max, y_min, y_max) {
+    this.x_min = x_min;
+    this.x_max = x_max;
+    this.y_min = y_min;
+    this.y_max = y_max;
+}
+
+function _drawCaption() {
+
+    _drawPlayerCaption('playerCaptionCanvas', _player_color);
+    _drawPlayerCaption('triedCaptionCanvas', _tried_position_color);
+    _drawPlayerCaption('expectedCaptionCanvas', _expected_position_color);
+    _drawPlayerCaption('finalCaptionCanvas', _final_position_color);
+
+    var canvas = document.getElementById('collisionTileCaptionCanvas');
+    var w = 25;
+    var h = 25;
+    canvas.setAttribute('width', w)
+    canvas.setAttribute('height', h)
+    var ctx = canvas.getContext('2d');
+    ctx.strokeStyle = _collision_tile_color;
+    ctx.strokeRect(0, 0, w, h);
+    _drawLine(ctx, new Position(0, 0), new Position(w, h));
+    _drawLine(ctx, new Position(w, 0), new Position(0, h));
+}
+
+function _drawPlayerCaption(id, color) {
+    var w = 15;
+    var h = 25;
+    var canvas = document.getElementById(id);
+    canvas.setAttribute('width', w)
+    canvas.setAttribute('height', h)
+    var ctx = canvas.getContext('2d');
+    ctx.strokeStyle = color;
+
+    ctx.strokeRect(0, 0, w, h);
+    _drawLine(ctx, new Position(w/2, (h/2)-2), new Position(w/2, (h/2)+2));
+    _drawLine(ctx, new Position((w/2)-2, h/2), new Position((w/2)+2, h/2));
+}
+
+function _getReport(player, collision_tiles, tried_player, expected_player, final_player, is_success, tilemap_get_at_pixel_call, description) {
+
+    var title_el = document.createElement('h2');
+    title_el.className = 'report-title';
+    title_el.innerHTML = 'Use Case ' + use_case_count;
+
+    var summary_el = document.createElement('div');
+    summary_el.className = 'report-summary';
+    summary_el.innerHTML = tilemap_get_at_pixel_call + ' calls to tilemap_get_at_pixel';
+
+    var description_el = document.createElement('p');
+    description_el.className = 'report-description';
+    description_el.innerHTML = description;
+
+    var status_el = document.createElement('div');
+    status_el.className = 'report-status ' + (is_success ? 'success' : 'fail');
+    status_el.innerHTML = is_success ? 'Success' : 'Fail';
+    
+    var report_el = document.createElement('div');
+    report_el.className = 'report';
+    report_el.appendChild(title_el);
+    report_el.appendChild(summary_el);
+    report_el.appendChild(description_el);
+    report_el.appendChild(status_el);
+    return report_el;
+}
+
+function _isSamePosition(player1, player2) {
+    return player1.x === player2.x && player1.y === player2.y;
+}
+
+function _clearUseCases() {
+    var container = document.getElementById('useCases');
+    while (container.firstChild) {
+        container.removeChild(container.firstChild);
+    }
+    use_case_count = 0;
+}
+
+function _start() {
+    _drawCaption();
+    _clearUseCases();
+    test();
+}
+
+
+var _player_color = '#263bc2';
+var _tried_position_color = '#7dbae5';
+var _final_position_color = '#eb1c1c';
+var _expected_position_color = '#39d64f';
+var _collision_tile_color = '#db335c';
+var _success_color = '#4be12d';
+var _fail_color = '#eb1c1c';
+var _grid_color = '#cbcac9';
+var _coord_font_color = _grid_color;
+var _canvas_size = 350;
+
+window.onload = _start;
+
+</script>
+</body>
+</html>
