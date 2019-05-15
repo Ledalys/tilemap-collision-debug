@@ -471,6 +471,11 @@ function _drawUseCase(player, collision_tiles, tried_position, expected_position
 
     var ctx = canvas.getContext('2d');
 
+    // status border
+    ctx.strokeStyle = is_success ? _success_color : _fail_color;
+    ctx.lineWidth = status_line_width;
+    ctx.strokeRect(0, 0, _canvas_size, _canvas_size);
+
     ctx.scale(scale, scale);
     ctx.translate(-bounds.x_min, -bounds.y_min);
 
@@ -480,11 +485,6 @@ function _drawUseCase(player, collision_tiles, tried_position, expected_position
         bounds.y_min,
         bounds.y_min + (_canvas_size/scale)
     );
-
-    // status border
-    ctx.strokeStyle = is_success ? _success_color : _fail_color;
-    ctx.lineWidth = status_line_width;
-    ctx.strokeRect(canvas_bounds.x_min, canvas_bounds.y_min, canvas_bounds.x_max - canvas_bounds.x_min, canvas_bounds.y_max - canvas_bounds.y_min);
 
     ctx.lineWidth = 1;
 
