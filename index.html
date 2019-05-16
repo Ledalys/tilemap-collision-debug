@@ -80,9 +80,15 @@
 <h1>GameMaker Tilemap Collision Use Cases</h1>
 
 <p>
-    Some usecases to show why the collision detection from <a href="https://www.youtube.com/watch?v=UyKdQQ3UR_0">this tutorial</a> is not working.
+    Some usecases to show when the collision detection from <a href="https://www.youtube.com/watch?v=UyKdQQ3UR_0">this tutorial</a> is not working.
     <br>
-    The fix by Tom Cheshire from comments is implemented and solved some use cases but it is still not fully efficient.
+    The fix by Tom Cheshire from comments is implemented and solved some use cases.
+    <br>
+    Unsupported use cases are :
+    <ul>
+    	<li>when the corner of a collision tile is on the player way but the player doesn't stop on it. There is a collision but the final position is wrong.</li>
+    	<li>when the player tries to jump through a tile in a single frame = vector longer than a tile width</li>
+	</ul>
 </p>
 
 <div id="useCases"></div>
@@ -185,11 +191,13 @@ function getValidPosition(x, y, xx, yy, bbox_left, bbox_top, bbox_right, bbox_bo
  */
 function test() {
 
+	// simple use cases
+
     addUseCase(
-        makePlayerFromTopLeft(64, 64),
+        makePlayerFromTopLeft(tile_size, tile_size),
         [],
-        makePlayerFromTopLeft(192, 192),
-        makePlayerFromTopLeft(192, 192),
+        makePlayerFromTopLeft(tile_size + 20, tile_size + 20),
+        makePlayerFromTopLeft(tile_size + 20, tile_size + 20),
         'No obstacle'
     );
 
@@ -209,6 +217,24 @@ function test() {
         makePlayerFromTopRight(wall_tile.x_min + 5, wall_tile.y_min + 10),
         makePlayerFromTopRight(wall_tile.x_min -1, wall_tile.y_min + 10),
         'Simple wall collision'
+    );
+
+    var wall_tile = findTile(3,2);
+    addUseCase(
+        makePlayerFromTopRight(wall_tile.x_min - 5, wall_tile.y_min + 5),
+        [wall_tile],
+        makePlayerFromTopLeft(wall_tile.x_min - 7, wall_tile.y_min + 10),
+        makePlayerFromTopRight(wall_tile.x_min -1, wall_tile.y_min + 10),
+        'Deeper wall collision'
+    );
+
+    var wall_tile = findTile(3,2);
+    addUseCase(
+        makePlayerFromTopRight(wall_tile.x_min - 5, wall_tile.y_min + 5),
+        [wall_tile],
+        makePlayerFromTopLeft(wall_tile.x_min + 5, wall_tile.y_min + 10),
+        makePlayerFromTopRight(wall_tile.x_min -1, wall_tile.y_min + 10),
+        'Deeper wall collision 2'
     );
 
     var corner_tile = findTile(3,3);
@@ -234,34 +260,192 @@ function test() {
         'Simple path collision'
     );
 
+    var ground_tile1 = findTile(2,2);
+    var ground_tile2 = findTile(3,2);
+    addUseCase(
+        makePlayerFromBottomRight(ground_tile1.x_max - 5, ground_tile1.y_min - 5),
+        [ground_tile1, ground_tile2],
+        makePlayerFromBottomRight(ground_tile2.x_min + 20, ground_tile2.y_min + 20),
+        makePlayerFromBottomRight(ground_tile2.x_min + 20, ground_tile2.y_min - 1),
+        '2 tiles ground collision'
+    );
 
+    var ground_tile1 = findTile(2,2);
+    var ground_tile2 = findTile(3,2);
+    addUseCase(
+        makePlayerFromBottomRight(ground_tile1.x_max - 5, ground_tile1.y_min - 5),
+        [ground_tile1, ground_tile2],
+        makePlayerFromBottomLeft(ground_tile2.x_min + 5, ground_tile2.y_min + 20),
+        makePlayerFromBottomLeft(ground_tile2.x_min + 5, ground_tile2.y_min - 1),
+        '2 tiles ground collision 2'
+    );
+
+    var ground_tile1 = findTile(2,2);
+    var ground_tile2 = findTile(3,2);
+    addUseCase(
+        makePlayerFromBottomRight(ground_tile1.x_max - 5, ground_tile1.y_min - 5),
+        [ground_tile1, ground_tile2],
+        makePlayerFromTopLeft(ground_tile2.x_min + 5, ground_tile2.y_min + 5),
+        makePlayerFromBottomLeft(ground_tile2.x_min + 5, ground_tile2.y_min - 1),
+        '2 tiles ground collision 3'
+    );
+
+    var ground_tile1 = findTile(2,2);
+    var ground_tile2 = findTile(3,2);
+    addUseCase(
+        makePlayerFromBottomRight(ground_tile1.x_max + 10, ground_tile1.y_min - 5),
+        [ground_tile1, ground_tile2],
+        makePlayerFromBottomLeft(ground_tile2.x_min + 5, ground_tile2.y_min + 20),
+        makePlayerFromBottomLeft(ground_tile2.x_min + 5, ground_tile2.y_min - 1),
+        '2 tiles ground collision 4'
+    );
+
+    var ground_tile1 = findTile(2,2);
+    var ground_tile2 = findTile(3,2);
+    addUseCase(
+        makePlayerFromTopRight(ground_tile1.x_max - 5, ground_tile1.y_min - tile_size - 5),
+        [ground_tile1, ground_tile2],
+        makePlayerFromBottomLeft(ground_tile2.x_min + 5, ground_tile2.y_min + 20),
+        makePlayerFromBottomLeft(ground_tile2.x_min + 5, ground_tile2.y_min - 1),
+        '2 tiles ground collision 5'
+    );
+
+    var ground_tile1 = findTile(2,2);
+    var ground_tile2 = findTile(3,2);
+    addUseCase(
+        makePlayerFromBottomRight(ground_tile1.x_max - 5, ground_tile1.y_min - tile_size + 5),
+        [ground_tile1, ground_tile2],
+        makePlayerFromBottomLeft(ground_tile2.x_min + 5, ground_tile2.y_min + 3),
+        makePlayerFromBottomLeft(ground_tile2.x_min + 5, ground_tile2.y_min - 1),
+        '2 tiles ground collision 6'
+    );
+
+    var ground_tile1 = findTile(2,2);
+    var ground_tile2 = findTile(3,2);
+    addUseCase(
+        makePlayerFromBottomRight(ground_tile1.x_max - 5, ground_tile1.y_min - 5),
+        [ground_tile1, ground_tile2, findTile(3,1)],
+        makePlayerFromTopLeft(ground_tile2.x_min + 5, ground_tile2.y_min + 5),
+        makePlayerFromBottomRight(ground_tile2.x_min - 1, ground_tile2.y_min - 1),
+        'Same with a wall'
+    );
+
+    var ground_tile1 = findTile(2,2);
+    var ground_tile2 = findTile(3,2);
+    addUseCase(
+        makePlayerFromBottomRight(ground_tile1.x_max - 5, ground_tile1.y_min - 5),
+        [ground_tile2, findTile(3,1)],
+        makePlayerFromTopLeft(ground_tile2.x_min + 5, ground_tile2.y_min + 5),
+        makePlayerFromTopRight(ground_tile2.x_min - 1, ground_tile2.y_min + 5),
+        'Same without ground'
+    );
+
+
+    // hight speed use cases = vector longer than tile_size
+
+    addUseCase(
+        makePlayerFromTopLeft(tile_size, tile_size),
+        [],
+        makePlayerFromTopLeft(tile_size * 3, tile_size * 3),
+        makePlayerFromTopLeft(tile_size * 3, tile_size * 3),
+        'Hight speed no obstacle'
+    );
 
     var ground_tile = findTile(2,2);
     addUseCase(
-        makePlayerFromBottomLeft(ground_tile.x_min + 5, ground_tile.y_min - 30),
+        makePlayerFromTopLeft(ground_tile.x_min + 5, ground_tile.y_min - tile_size + 5),
         [ground_tile],
         makePlayerFromTopRight(ground_tile.x_max - 5, ground_tile.y_min + 30),
         makePlayerFromBottomRight(ground_tile.x_max - 5, ground_tile.y_min - 1),
         'Hight speed ground collision'
     );
 
-    var ground_tile = findTile(3,2);
+    var wall_tile = findTile(3,2);
     addUseCase(
-        makePlayerFromTopRight(ground_tile.x_min - 30, ground_tile.y_min - 5),
-        [ground_tile],
-        makePlayerFromTopLeft(ground_tile.x_min + 30, ground_tile.y_min + 30),
-        makePlayerFromTopRight(ground_tile.x_min - 1, ground_tile.y_min + 30),
+        makePlayerFromTopRight(wall_tile.x_min - 15, wall_tile.y_min + 5),
+        [wall_tile],
+        makePlayerFromTopRight(wall_tile.x_max + 5, wall_tile.y_min + 10),
+        makePlayerFromTopRight(wall_tile.x_min - 1, wall_tile.y_min + 10),
         'Hight speed wall collision'
     );
 
     var ground_tile = findTile(3,3);
     addUseCase(
-        makePlayerFromBottomRight(ground_tile.x_min - 50, ground_tile.y_min - 20),
+        makePlayerFromTopLeft(ground_tile.x_min - tile_size + 1, ground_tile.y_min - tile_size + 1),
         [ground_tile, findTile(1,3), findTile(2,3), findTile(3,2)],
-        makePlayerFromTopLeft(ground_tile.x_min + 30, ground_tile.y_min + 30),
+        makePlayerFromBottomRight(ground_tile.x_max - 1, ground_tile.y_max - 1),
         makePlayerFromBottomRight(ground_tile.x_min - 1, ground_tile.y_min - 1),
-        'Hight speed ground and wall collision'
+        'Hight speed ground and wall collision 1'
     );
+
+    var ground_tile = findTile(3,3);
+    addUseCase(
+        makePlayerFromTopLeft(ground_tile.x_min - tile_size - 20, ground_tile.y_min - 64 + 10),
+        [ground_tile, findTile(1,3), findTile(2,3), findTile(3,2)],
+        makePlayerFromTopLeft(ground_tile.x_min + 5, ground_tile.y_min + 5),
+        makePlayerFromBottomRight(ground_tile.x_min - 1, ground_tile.y_min - 1),
+        'Hight speed ground and wall collision 2'
+    );
+
+    var ground_tile = findTile(3,3);
+    addUseCase(
+        makePlayerFromTopLeft(ground_tile.x_min - tile_size - 20, ground_tile.y_min - 64 + 10),
+        [ground_tile, findTile(1,3), findTile(2,3), findTile(3,2)],
+        makePlayerFromBottomLeft(ground_tile.x_min + 5, ground_tile.y_max + 5),
+        makePlayerFromBottomRight(ground_tile.x_min - 1, ground_tile.y_min - 1),
+        'Hight speed ground and wall collision 3'
+    );
+
+
+    // big player = width or height > tile_size
+
+    var big_player_size = tile_size + 5;
+
+    addUseCase(
+        makePlayerFromTopLeft(tile_size - 5, tile_size - 5, big_player_size, big_player_size),
+        [],
+        makePlayerFromTopLeft(tile_size + 20, tile_size + 20, big_player_size, big_player_size),
+        makePlayerFromTopLeft(tile_size + 20, tile_size + 20, big_player_size, big_player_size),
+        'Big player no obstacle'
+    );
+
+    var ground_tile = findTile(2,2);
+    addUseCase(
+        makePlayerFromBottomLeft(ground_tile.x_min + 5, ground_tile.y_min - 3, big_player_size, big_player_size),
+        [ground_tile],
+        makePlayerFromBottomLeft(ground_tile.x_min + 10, ground_tile.y_min + 3, big_player_size, big_player_size),
+        makePlayerFromBottomLeft(ground_tile.x_min + 10, ground_tile.y_min - 1, big_player_size, big_player_size),
+        'Big player ground collision'
+    );
+
+    var wall_tile = findTile(3,2);
+    addUseCase(
+        makePlayerFromTopRight(wall_tile.x_min - 5, wall_tile.y_min + 5, big_player_size, big_player_size),
+        [wall_tile],
+        makePlayerFromTopRight(wall_tile.x_min + 5, wall_tile.y_min + 10, big_player_size, big_player_size),
+        makePlayerFromTopRight(wall_tile.x_min -1, wall_tile.y_min + 10, big_player_size, big_player_size),
+        'Big player wall collision'
+    );
+
+    var corner_tile = findTile(3,3);
+    addUseCase(
+        makePlayerFromBottomRight(corner_tile.x_min - 5, corner_tile.y_min - 5, big_player_size, big_player_size),
+        [corner_tile, findTile(2,3), findTile(3,2)],
+        makePlayerFromBottomRight(corner_tile.x_min + 5, corner_tile.y_min + 5, big_player_size, big_player_size),
+        makePlayerFromBottomRight(corner_tile.x_min - 1, corner_tile.y_min - 1, big_player_size, big_player_size),
+        'Big player corner collision'
+    );
+
+    var ground_tile1 = findTile(2,2);
+    var ground_tile2 = findTile(3,2);
+    addUseCase(
+        makePlayerFromBottomRight(ground_tile1.x_max - 5, ground_tile1.y_min - 5, big_player_size, big_player_size),
+        [ground_tile1, ground_tile2],
+        makePlayerFromBottomRight(ground_tile2.x_min + 20, ground_tile2.y_min + 20, big_player_size, big_player_size),
+        makePlayerFromBottomRight(ground_tile2.x_min + 20, ground_tile2.y_min - 1, big_player_size, big_player_size),
+        'Big player 2 tiles ground collision'
+    );
+
 }
 
 
@@ -304,8 +488,8 @@ function Player(x, y, bbox_left, bbox_top, bbox_right, bbox_bottom) {
     this.bbox_right = bbox_right;
     this.bbox_bottom = bbox_bottom;
 
-    this.width = this.bbox_right - this.bbox_left;
-    this.height = this.bbox_bottom - this.bbox_top;
+    this.width = () => this.bbox_right - this.bbox_left;
+    this.height = () => this.bbox_bottom - this.bbox_top;
 }
 
 /**
@@ -374,8 +558,9 @@ function Tile(x_min, x_max, y_min, y_max) {
     this.x_max = x_max;
     this.y_min = y_min;
     this.y_max = y_max;
-    this.width = this.x_max - this.x_min;
-    this.height = this.x_max - this.x_min;
+    this.id = 1;
+    this.width = () => this.x_max - this.x_min;
+    this.height = () => this.x_max - this.x_min;
 }
 
 /**
@@ -421,7 +606,7 @@ function _testScript(player, collision_tiles, tried_position) {
             }
             return false;
         });
-        return res ? 1 : 0; // 1 is the id of the collision tile in the tilemap in GameMaker
+        return res ? res.id : 0;
     }
     var final_pos_arr = getValidPosition(player.x, player.y, tried_position.x - player.x, tried_position.y - player.y, player.bbox_left, player.bbox_top, player.bbox_right, player.bbox_bottom, tilemap_get_at_pixel, tile_size);
     return {final_pos_arr: final_pos_arr, tilemap_get_at_pixel_call: tilemap_get_at_pixel_call};
@@ -438,6 +623,7 @@ function _drawUseCase(player, collision_tiles, tried_position, expected_position
     var status_line_width = 5;
 
     var container = document.createElement('div');
+    container.id = 'useCase' + use_case_count;
     container.appendChild(_getReport(player, collision_tiles, tried_player, expected_player, final_player, is_success, tilemap_get_at_pixel_call, description));
 
     container.className = 'use-case';
@@ -523,7 +709,7 @@ function _drawUseCase(player, collision_tiles, tried_position, expected_position
     ctx.strokeStyle = _collision_tile_color;
     ctx.globalAlpha = 0.5;
     collision_tiles.forEach((tile) => {
-        ctx.strokeRect(tile.x_min, tile.y_min, tile.width, tile.height);
+        ctx.strokeRect(tile.x_min, tile.y_min, tile.width(), tile.height());
         _drawLine(ctx, new Position(tile.x_min, tile.y_min), new Position(tile.x_max, tile.y_max));
         _drawLine(ctx, new Position(tile.x_max, tile.y_min), new Position(tile.x_min, tile.y_max));
     });
@@ -565,13 +751,13 @@ function _boundsAddMargin(bounds, mx, my) {
 }
 
 function _drawPlayer(ctx, player) {
-    ctx.strokeRect(player.bbox_left, player.bbox_top, player.width, player.height);
+    ctx.strokeRect(player.bbox_left, player.bbox_top, player.width(), player.height());
     _drawXY(ctx, player.x, player.y);
 }
 
 function _drawPathBetweenPlayers(ctx, player1, player2) {
-    ctx.setLineDash([5, 15]);
-    ctx.globalAlpha = 0.3;
+    ctx.setLineDash(_paths_dash);
+    ctx.globalAlpha = _paths_alpha;
     if (player1.bbox_left < player2.bbox_left && player1.bbox_top >= player2.bbox_top || player1.bbox_left >= player2.bbox_left && player1.bbox_top < player2.bbox_top)
         _drawLine(ctx, new Position(player1.bbox_left, player1.bbox_top), new Position(player2.bbox_left, player2.bbox_top));
     if (player1.bbox_right <= player2.bbox_right && player1.bbox_top < player2.bbox_top || player1.bbox_right > player2.bbox_right && player1.bbox_top >= player2.bbox_top)
@@ -737,6 +923,8 @@ var _fail_color = '#eb1c1c';
 var _grid_color = '#cbcac9';
 var _coord_font_color = _grid_color;
 var _canvas_size = 350;
+var _paths_alpha = 0.3;
+var _paths_dash = [5, 15];
 
 window.onload = _start;
 
