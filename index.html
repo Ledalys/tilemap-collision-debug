@@ -260,6 +260,19 @@ function test() {
         'Simple path collision'
     );
 
+    var collision_tile = findTile(2,1);
+    var player_start = makePlayerFromTopRight(collision_tile.x_min - 15, collision_tile.y_max - 5);
+    var player_tried = makePlayerFromTopRight(collision_tile.x_min + 10, collision_tile.y_max + 10);
+    var expected_x = collision_tile.x_min - 1;
+    var player_expected = makePlayerFromTopRight(expected_x, expected_y);
+    addUseCase(
+        player_start,
+        [collision_tile],
+        player_tried,
+        player_tried,
+        'Simple path near collision tile'
+    );
+
     var ground_tile1 = findTile(2,2);
     var ground_tile2 = findTile(3,2);
     addUseCase(
