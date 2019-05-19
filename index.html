@@ -619,28 +619,6 @@ function test() {
 
 }
 
-/**
- * @see https://math.stackexchange.com/questions/2297518/find-x-value-on-a-line-segment-with-given-y
- * @param {number} point_y - Y coordinate of the point
- * @param {(Player|Position)} position1 - One of the vector end
- * @param {(Player|Position)} position2 - The other vector end
- * @returns {number} point_x
- */
-function getXOnVector(point_y, position1, position2) {
-    return position1.x + ( ( (point_y - position1.y) * (position2.x - position1.x) ) / (position2.y - position1.y) );
-}
-
-/**
- * @see https://math.stackexchange.com/questions/2297518/find-x-value-on-a-line-segment-with-given-y
- * @param {number} point_x - X coordinate of the point
- * @param {(Player|Position)} position1 - One of the vector end
- * @param {(Player|Position)} position2 - The other vector end
- * @returns {number} point_y
- */
-function getYOnVector(point_x, position1, position2) {
-    return position1.y + ( ( (point_x - position1.x) * (position2.y - position1.y) ) / (position2.x - position1.x) );
-}
-
 
 
 
@@ -775,6 +753,28 @@ function Position(x, y) {
  */
 function concatLB(...lines) {
     return lines.join('<br>');
+}
+
+/**
+ * @see https://math.stackexchange.com/questions/2297518/find-x-value-on-a-line-segment-with-given-y
+ * @param {number} point_y - Y coordinate of the point
+ * @param {(Player|Position)} position1 - One of the vector end
+ * @param {(Player|Position)} position2 - The other vector end
+ * @returns {number} point_x
+ */
+function getXOnVector(point_y, position1, position2) {
+    return position1.x + ( ( (point_y - position1.y) * (position2.x - position1.x) ) / (position2.y - position1.y) );
+}
+
+/**
+ * @see https://math.stackexchange.com/questions/2297518/find-x-value-on-a-line-segment-with-given-y
+ * @param {number} point_x - X coordinate of the point
+ * @param {(Player|Position)} position1 - One of the vector end
+ * @param {(Player|Position)} position2 - The other vector end
+ * @returns {number} point_y
+ */
+function getYOnVector(point_x, position1, position2) {
+    return position1.y + ( ( (point_x - position1.x) * (position2.y - position1.y) ) / (position2.x - position1.x) );
 }
 
 
