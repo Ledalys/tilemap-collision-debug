@@ -86,9 +86,9 @@
     <br>
     Unsupported use cases are :
     <ul>
-    	<li>when the corner of a collision tile is on the player way but the player doesn't stop on it. There is a collision but the final position is wrong.</li>
-    	<li>when the player tries to jump through a tile in a single frame = vector longer than a tile width</li>
-	</ul>
+        <li>when the corner of a collision tile is on the player way but the player doesn't stop on it. There is a collision but the final position is wrong.</li>
+        <li>when the player tries to jump through a tile in a single frame = vector longer than a tile width</li>
+    </ul>
 </p>
 
 <div id="useCases"></div>
@@ -145,7 +145,7 @@ function getValidPosition(x, y, xx, yy, bbox_left, bbox_top, bbox_right, bbox_bo
 
     // if (use_case_count == 2) console.log(xx);
 
-	return [x + xx, y + yy];
+    return [x + xx, y + yy];
 }
 
 /**
@@ -153,8 +153,8 @@ function getValidPosition(x, y, xx, yy, bbox_left, bbox_top, bbox_right, bbox_bo
  */
 function test() {
 
-	///////// DIRECTION = NO DIRECTION
-	var descr_direction = 'not moving';
+    ///////// DIRECTION = NO DIRECTION
+    var descr_direction = 'not moving';
 
     var start = makePlayerFromTopLeft(tile_size + 5, tile_size + 5);
     var tried = start;
@@ -167,10 +167,10 @@ function test() {
         descr_direction
     );
 
-	///////// DIRECTION = BOTTOM RIGHT
-	var descr_direction = 'to bottom right';
+    ///////// DIRECTION = BOTTOM RIGHT
+    var descr_direction = 'to bottom right';
 
-	// simple inside a tile
+    // simple inside a tile
     var description = concatLB(descr_direction, 'inside 1 tile');
 
     var start = makePlayerFromTopLeft(tile_size + 5, tile_size + 5);
@@ -197,7 +197,7 @@ function test() {
     );
     zoom = 0;
 
-	// simple move from 1 tile to 1 other
+    // simple move from 1 tile to 1 other
     var description = concatLB(descr_direction, '1 tile to 1 other');
 
     var start = makePlayerFromBottomLeft(tile_size + 3, tile_size - 5);
@@ -635,7 +635,7 @@ function test() {
  * @returns {number} point_x
  */
 function getXOnVector(point_y, position1, position2) {
-	return position1.x + ( ( (point_y - position1.y) * (position2.x - position1.x) ) / (position2.y - position1.y) );
+    return position1.x + ( ( (point_y - position1.y) * (position2.x - position1.x) ) / (position2.y - position1.y) );
 }
 
 /**
@@ -646,7 +646,7 @@ function getXOnVector(point_y, position1, position2) {
  * @returns {number} point_y
  */
 function getYOnVector(point_x, position1, position2) {
-	return position1.y + ( ( (point_x - position1.x) * (position2.y - position1.y) ) / (position2.x - position1.x) );
+    return position1.y + ( ( (point_x - position1.x) * (position2.y - position1.y) ) / (position2.x - position1.x) );
 }
 
 
@@ -782,7 +782,7 @@ function Position(x, y) {
  * Concat strings with line breaks
  */
 function concatLB(...lines) {
-	return lines.join('<br>');
+    return lines.join('<br>');
 }
 
 
@@ -852,12 +852,12 @@ function _drawUseCase(player, collision_tiles, tried_position, expected_position
 
     // apply zoom
     if (zoom != 0) {
-	    if (zoom > 0) {
-	    	zoom_margin = (bounds.width() - (bounds.width() / (zoom + 1))) / 2 * -1;
-	    } else {
-	    	zoom_margin = ((bounds.width() * (Math.abs(zoom) + 1)) - bounds.width()) / 2;
-	    }
-    	bounds = _boundsAddMargin(bounds, zoom_margin,  zoom_margin);
+        if (zoom > 0) {
+            zoom_margin = (bounds.width() - (bounds.width() / (zoom + 1))) / 2 * -1;
+        } else {
+            zoom_margin = ((bounds.width() * (Math.abs(zoom) + 1)) - bounds.width()) / 2;
+        }
+        bounds = _boundsAddMargin(bounds, zoom_margin,  zoom_margin);
     }
 
     scale = _canvas_size / Math.max(bounds.x_max - bounds.x_min, bounds.y_max - bounds.y_min);
@@ -1048,10 +1048,10 @@ function _Bounds(x_min, x_max, y_min, y_max) {
     this.y_min = y_min;
     this.y_max = y_max;
     this.width = function() {
-    	return this.x_max - this.x_min;
+        return this.x_max - this.x_min;
     }
     this.height = function() {
-    	return this.y_max - this.y_min;
+        return this.y_max - this.y_min;
     }
 }
 
