@@ -135,9 +135,98 @@ var use_case_count = 0; // the use case number for debug purpose
  */
 function getValidPosition(x, y, xx, yy, bbox_left, bbox_top, bbox_right, bbox_bottom, tilemap_get_at_pixel, tile_size) {
 
-    // if (use_case_count == 2) console.log(xx);
+	//return [x+xx, y+yy]
+	//if (use_case_count === 5) {console.log(next_bottom_point);return;}
+	//if (use_case_count === 5) console.log(next_bottom_point);
 
-    return [x + xx, y + yy];
+
+    // TODO : là on test juste le cas où on va vers le bas à droite, mais il faut gérer toutes les direction (dont les directions xx=0 ou yy=0)
+
+    var tried_bbox_right = bbox_right + xx;
+    var tried_bbox_bottom = bbox_bottom + yy;
+
+    var loop_count = 0;
+
+    // trouve la position du coin bas droit du joueur avant collision
+    var findBottomRightPosition = function(curr_bbox_right, curr_bbox_bottom) {
+    	loop_count++;
+
+	    let curr_tile_bbox_left = curr_bbox_right - (curr_bbox_right % tile_size);
+	    let curr_tile_bbox_top = curr_bbox_bottom - (curr_bbox_bottom % tile_size);
+
+	    // prochaine valeur de x à partir de laquelle le player va entrer dans une nouvelle tile
+	    let next_wall_x = curr_tile_bbox_left + tile_size;
+	    let next_wall_y = curr_tile_bbox_top + tile_size;
+
+    	let next_right_point, next_bottom_point;
+
+	    // si next_wall_x >= bbox_right + xx ça veut dire que bbox_right ne traverse aucune nouvelle tile donc on a que les tile en dessous à check
+	    if (next_wall_x < tried_bbox_right) {
+	    	next_right_point = new Position(next_wall_x, getYOnVector(next_wall_x, new Position(bbox_right, bbox_bottom), new Position(tried_bbox_right, tried_bbox_bottom)));
+	    }
+	    if (next_wall_y < tried_bbox_bottom) {
+	    	next_bottom_point = new Position(getXOnVector(next_wall_y, new Position(bbox_right, bbox_bottom), new Position(tried_bbox_right, tried_bbox_bottom)), next_wall_y);
+	    }
+
+	    let next_point, next_safe_point, next_point_side;
+	    if (next_right_point && !next_bottom_point) {
+	    	next_point = next_right_point;
+	    	next_point_side = 'right';
+	    	//next_safe_point = new Position(next_point.x - 1, next_point.y); // todo : le y devrait être recalculé, mais pour 1px pas la peine si ?
+	    	next_safe_point = new Position(next_point.x - 1, getYOnVector(next_point.x - 1, new Position(bbox_right, bbox_bottom), new Position(tried_bbox_right, tried_bbox_bottom)));
+
+	    } else if (!next_right_point && next_bottom_point) {
+	    	next_point = next_bottom_point;
+	    	next_point_side = 'bottom';
+	    	//next_safe_point = new Position(next_point.x, next_point.y - 1);
+	    	next_safe_point = new Position(getXOnVector(next_point.y - 1, new Position(bbox_right, bbox_bottom), new Position(tried_bbox_right, tried_bbox_bottom)), next_point.y - 1);
+	    } else if (next_right_point && next_bottom_point) {
+	    	// next_point = le point qui est 1 px en dehors de la tile courante
+	    	if (next_right_point.x - tile_size === curr_tile_bbox_left && next_right_point.y - (next_right_point.y % tile_size) === curr_tile_bbox_top) {
+	    		next_point = next_right_point;
+	    		next_point_side = 'right';
+	    		next_safe_point = new Position(next_point.x - 1, getYOnVector(next_point.x - 1, new Position(bbox_right, bbox_bottom), new Position(tried_bbox_right, tried_bbox_bottom)));
+	    	} else if (next_bottom_point.y - tile_size === curr_tile_bbox_top && next_bottom_point.x - (next_bottom_point.x % tile_size) === curr_tile_bbox_left) {
+	    		next_point = next_bottom_point;
+	    		next_point_side = 'bottom';
+	    		next_safe_point = new Position(getXOnVector(next_point.y - 1, new Position(bbox_right, bbox_bottom), new Position(tried_bbox_right, tried_bbox_bottom)), next_point.y - 1);
+	    	} else {
+	    		// le player est pile dans l'angle de la tile courante
+	    		// donc les 2 points sont les mêmes
+	    		next_point = next_bottom_point;
+	    		next_point_side = 'both';
+	    		// les 2 safe points possibles sont les même aussi ?
+	    		next_safe_point = new Position(getXOnVector(next_point.y - 1, new Position(bbox_right, bbox_bottom), new Position(tried_bbox_right, tried_bbox_bottom)), next_point.y - 1);
+	    	}
+	    } else {
+	    	return new Position(tried_bbox_right, tried_bbox_bottom); // on est arrivé au bout sans mur
+	    }
+
+	    // check la tile en bas du coin bas droit
+	    if (tilemap_get_at_pixel(tilemap, next_point.x, next_point.y)) {
+	    	return next_safe_point;
+	    }
+
+	    if (next_point_side === 'bottom' || next_point_side === 'both') {
+	    	// on doit aussi check le coin bas gauche
+		    // todo : uniquement si il est dans une tile != du coin bas droit (mieux vaut faire un module ou un tilemap_get_at_pixel ? Modulo je pense)
+		    if (tilemap_get_at_pixel(tilemap, next_point.x - (bbox_right - bbox_left), next_point.y)) {
+		    	return next_safe_point;
+		    }
+	    }
+	    if (next_point_side === 'right' || next_point_side === 'both') {
+	    	// on doit aussi check le coin haut droit
+		    // todo : uniquement si il est dans une tile != du coin bas droit
+		    if (tilemap_get_at_pixel(tilemap, next_point.x, next_point.y - (bbox_bottom - bbox_top))) {
+		    	return next_safe_point;
+		    }
+	    }
+
+	    return findBottomRightPosition(next_point.x, next_point.y);
+    }
+
+    var last_position = findBottomRightPosition(bbox_right, bbox_bottom);
+    return [last_position.x - (bbox_right - x), last_position.y - (bbox_bottom - y)];
 }
 
 /**
@@ -378,7 +467,7 @@ function test() {
         description
     );
     zoom = 0;
-    
+
     zoom = -0.5;
     var start = makePlayerFromTopLeft(tile_size - 5, tile_size - 5);
     var tried = makePlayerFromTopLeft(tile_size + 5, tile_size + 5);
@@ -391,7 +480,7 @@ function test() {
         description
     );
     zoom = 0;
-    
+
     zoom = -0.5;
     var start = makePlayerFromTopLeft(tile_size - 5, tile_size - 5);
     var tried = makePlayerFromTopLeft(tile_size + 5, tile_size + 5);
@@ -404,7 +493,7 @@ function test() {
         description
     );
     zoom = 0;
-    
+
     zoom = -1.5;
     var start = makePlayerFromTopLeft(tile_size - 5, tile_size - 5);
     var tried = makePlayerFromTopLeft(tile_size + 5, tile_size + 5);
@@ -432,7 +521,7 @@ function test() {
         expect,
         description
     );
-    
+
     zoom = -1.5;
     var start = makePlayerFromTopLeft(tile_size - 10, tile_size - 5);
     var tried = makePlayerFromTopLeft(tile_size - 5, tile_size + 5);
@@ -460,7 +549,7 @@ function test() {
         expect,
         description
     );
-    
+
     zoom = -1.5;
     var start = makePlayerFromTopLeft(tile_size - 10, tile_size - 10);
     var tried = makePlayerFromTopLeft(tile_size - 5, tile_size - 5);
@@ -541,6 +630,81 @@ function test() {
     var description = concatLB(descr_direction, '1 tile to 4');
 
     var start = makePlayerFromBottomRight(tile_size * 2 - 10, tile_size - 10);
+    var tried = makePlayerFromBottomRight(tile_size * 2 + 5, tile_size + 15);
+    var expect = tried;
+    addUseCase(
+        start,
+        [],
+        tried,
+        expect,
+        description
+    );
+
+    var tile = findTile(1,1);
+    var start = makePlayerFromBottomRight(tile.x_max - 10, tile.y_min - 10);
+    var tried = makePlayerFromBottomRight(tile.x_max + 5, tile.y_min + 15);
+    var expect = makePlayerFromBottomRight(getXOnVector(tile.y_min - 1, new Position(start.bbox_right, start.bbox_bottom), new Position(tried.bbox_right, tried.bbox_bottom)), tile.y_min - 1);
+    addUseCase(
+        start,
+        [tile],
+        tried,
+        expect,
+        description
+    );
+
+    var tile = findTile(2,1);
+    var start = makePlayerFromBottomRight(tile_size * 2 - 5, tile_size - 5);
+    var tried = makePlayerFromBottomRight(tile_size * 2 + 5, tile_size + 15);
+    var expect = makePlayerFromBottomRight(tile_size * 2 - 1, getYOnVector(tile_size * 2 - 1,  new Position(start.bbox_right, start.bbox_bottom), new Position(tried.bbox_right, tried.bbox_bottom)));
+    addUseCase(
+        start,
+        [tile],
+        tried,
+        expect,
+        description
+    );
+
+    var tile = findTile(2,1);
+    var start = makePlayerFromBottomRight(tile_size * 2 - 10, tile_size - 5);
+    var tried = makePlayerFromBottomRight(tile_size * 2 + 5, tile_size + 15);
+    var expect = makePlayerFromBottomRight(tile.x_min - 1, getYOnVector(tile_size * 2 - 1, new Position(start.bbox_right, start.bbox_bottom), new Position(tried.bbox_right, tried.bbox_bottom)));
+    addUseCase(
+        start,
+        [tile],
+        tried,
+        expect,
+        description
+    );
+
+    var tile = findTile(2,1);
+    var start = makePlayerFromBottomRight(tile_size * 2 - 5, tile_size - 10);
+    var tried = makePlayerFromBottomRight(tile_size * 2 + 10, tile_size + 15);
+    var expect = makePlayerFromBottomRight(getXOnVector(tile.y_min - 1, new Position(start.bbox_right, start.bbox_bottom), new Position(tried.bbox_right, tried.bbox_bottom)), tile.y_min - 1);
+    addUseCase(
+        start,
+        [tile],
+        tried,
+        expect,
+        description
+    );
+
+    var tile = findTile(2,0);
+    var start = makePlayerFromBottomRight(tile_size * 2 - 10, tile_size - 10);
+    var tried = makePlayerFromBottomRight(tile_size * 2 + 5, tile_size + 15);
+    var expect = makePlayerFromBottomRight(tile.x_min - 1, getYOnVector(tile.x_min - 1, new Position(start.bbox_right, start.bbox_bottom), new Position(tried.bbox_right, tried.bbox_bottom)));
+    addUseCase(
+        start,
+        [tile],
+        tried,
+        expect,
+        description
+    );
+
+
+    // simple move from 1 tile to 4
+    var description = concatLB(descr_direction, '1 tile to 4 (perfect angle)');
+
+    var start = makePlayerFromBottomRight(tile_size * 2 - 10, tile_size - 10);
     var tried = makePlayerFromBottomRight(tile_size * 2 + 5, tile_size + 5);
     var expect = tried;
     addUseCase(
@@ -610,7 +774,7 @@ function test() {
         expect,
         description
     );
-
+//*/
     // todo :
     //  - tester les autres directions (peut être pas refaire tous les tests mais au moins quelques un de pertinents)
     //  - faire les tests avec xx ou yy qui vaut 0
@@ -763,6 +927,7 @@ function concatLB(...lines) {
  * @returns {number} point_x
  */
 function getXOnVector(point_y, position1, position2) {
+	if (position1.x == position2.x) return position1.x;
     return position1.x + ( ( (point_y - position1.y) * (position2.x - position1.x) ) / (position2.y - position1.y) );
 }
 
@@ -774,7 +939,15 @@ function getXOnVector(point_y, position1, position2) {
  * @returns {number} point_y
  */
 function getYOnVector(point_x, position1, position2) {
+	if (position1.y == position2.y) return position1.x;
     return position1.y + ( ( (point_x - position1.x) * (position2.y - position1.y) ) / (position2.x - position1.x) );
+}
+
+/**
+ * @see https://mathinsight.org/definition/magnitude_vector
+ */
+function getVectorMagnitude(position1, position2) {
+	return Math.sqrt(Math.pow(position1.x - position2.x, 2) + Math.pow(position1.y - position2.y, 2));
 }
 
 
