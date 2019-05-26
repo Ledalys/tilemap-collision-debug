@@ -137,96 +137,145 @@ function getValidPosition(x, y, xx, yy, bbox_left, bbox_top, bbox_right, bbox_bo
 
 	//return [x+xx, y+yy]
 	//if (use_case_count === 5) {console.log(next_bottom_point);return;}
-	//if (use_case_count === 5) console.log(next_bottom_point);
-
-
-    // TODO : là on test juste le cas où on va vers le bas à droite, mais il faut gérer toutes les direction (dont les directions xx=0 ou yy=0)
-
-    var tried_bbox_right = bbox_right + xx;
-    var tried_bbox_bottom = bbox_bottom + yy;
+	//if (use_case_count === 5) {console.log(next_bottom_point);}
 
     var loop_count = 0;
 
-    // trouve la position du coin bas droit du joueur avant collision
-    var findBottomRightPosition = function(curr_bbox_right, curr_bbox_bottom) {
-    	loop_count++;
+    // xside = left or right side
+    // yside = bottom or top side
 
-	    let curr_tile_bbox_left = curr_bbox_right - (curr_bbox_right % tile_size);
-	    let curr_tile_bbox_top = curr_bbox_bottom - (curr_bbox_bottom % tile_size);
+    var front_bbox_xside, front_bbox_yside, tried_bbox_xside, tried_bbox_yside, next_tile_xdist, next_tile_ydist, xside_sign, yside_sign, xside_offset, yside_offset;
+    if (xx === 0) {
+        // pas de déplacement en x donc on prend un point au hasard
+        front_bbox_xside = bbox_right;
+        next_tile_xdist = tile_size;
+        xside_sign = 1;
+        xside_offset = bbox_right - x;
+    } else if (xx > 0) {
+        // to the right
+        front_bbox_xside = bbox_right;
+        next_tile_xdist = tile_size;
+        xside_sign = 1;
+        xside_offset = bbox_right - x;
+    } else {
+        // to the left
+        front_bbox_xside = bbox_left;
+        next_tile_xdist = -1;
+        xside_sign = -1;
+        xside_offset = x - bbox_left;
+    }
+    tried_bbox_xside = front_bbox_xside + xx;
 
-	    // prochaine valeur de x à partir de laquelle le player va entrer dans une nouvelle tile
-	    let next_wall_x = curr_tile_bbox_left + tile_size;
-	    let next_wall_y = curr_tile_bbox_top + tile_size;
+    if (yy === 0) {
+        // pas de déplacement en y donc on prend un point au hasard
+        front_bbox_yside = bbox_bottom;
+        next_tile_ydist = tile_size;
+        yside_sign = 1;
+        yside_offset = bbox_bottom - y;
+    } else if (yy > 0) {
+        // to the bottom
+        front_bbox_yside = bbox_bottom;
+        next_tile_ydist = tile_size;
+        yside_sign = 1;
+        yside_offset = bbox_bottom - y;
+    } else {
+        // to the left
+        front_bbox_yside = bbox_top;
+        next_tile_ydist = -1;
+        yside_sign = -1;
+        yside_offset = y - bbox_top;
+    }
+    tried_bbox_yside = front_bbox_yside + yy;
 
-    	let next_right_point, next_bottom_point;
+    var start_pos = new Position(front_bbox_xside, front_bbox_yside);
+    var tried_pos = new Position(tried_bbox_xside, tried_bbox_yside);
 
-	    // si next_wall_x >= bbox_right + xx ça veut dire que bbox_right ne traverse aucune nouvelle tile donc on a que les tile en dessous à check
-	    if (next_wall_x < tried_bbox_right) {
-	    	next_right_point = new Position(next_wall_x, getYOnVector(next_wall_x, new Position(bbox_right, bbox_bottom), new Position(tried_bbox_right, tried_bbox_bottom)));
-	    }
-	    if (next_wall_y < tried_bbox_bottom) {
-	    	next_bottom_point = new Position(getXOnVector(next_wall_y, new Position(bbox_right, bbox_bottom), new Position(tried_bbox_right, tried_bbox_bottom)), next_wall_y);
-	    }
+    // trouve la position la plus proche avant collision
+    var findClosestPosition = function(curr_bbox_xside, curr_bbox_yside) {
+        loop_count++;
 
-	    let next_point, next_safe_point, next_point_side;
-	    if (next_right_point && !next_bottom_point) {
-	    	next_point = next_right_point;
-	    	next_point_side = 'right';
-	    	//next_safe_point = new Position(next_point.x - 1, next_point.y); // todo : le y devrait être recalculé, mais pour 1px pas la peine si ?
-	    	next_safe_point = new Position(next_point.x - 1, getYOnVector(next_point.x - 1, new Position(bbox_right, bbox_bottom), new Position(tried_bbox_right, tried_bbox_bottom)));
+        let curr_tile_bbox_left = curr_bbox_xside - (curr_bbox_xside % tile_size);
+        let curr_tile_bbox_top = curr_bbox_yside - (curr_bbox_yside % tile_size);
 
-	    } else if (!next_right_point && next_bottom_point) {
-	    	next_point = next_bottom_point;
-	    	next_point_side = 'bottom';
-	    	//next_safe_point = new Position(next_point.x, next_point.y - 1);
-	    	next_safe_point = new Position(getXOnVector(next_point.y - 1, new Position(bbox_right, bbox_bottom), new Position(tried_bbox_right, tried_bbox_bottom)), next_point.y - 1);
-	    } else if (next_right_point && next_bottom_point) {
-	    	// next_point = le point qui est 1 px en dehors de la tile courante
-	    	if (next_right_point.x - tile_size === curr_tile_bbox_left && next_right_point.y - (next_right_point.y % tile_size) === curr_tile_bbox_top) {
-	    		next_point = next_right_point;
-	    		next_point_side = 'right';
-	    		next_safe_point = new Position(next_point.x - 1, getYOnVector(next_point.x - 1, new Position(bbox_right, bbox_bottom), new Position(tried_bbox_right, tried_bbox_bottom)));
-	    	} else if (next_bottom_point.y - tile_size === curr_tile_bbox_top && next_bottom_point.x - (next_bottom_point.x % tile_size) === curr_tile_bbox_left) {
-	    		next_point = next_bottom_point;
-	    		next_point_side = 'bottom';
-	    		next_safe_point = new Position(getXOnVector(next_point.y - 1, new Position(bbox_right, bbox_bottom), new Position(tried_bbox_right, tried_bbox_bottom)), next_point.y - 1);
-	    	} else {
-	    		// le player est pile dans l'angle de la tile courante
-	    		// donc les 2 points sont les mêmes
-	    		next_point = next_bottom_point;
-	    		next_point_side = 'both';
-	    		// les 2 safe points possibles sont les même aussi ?
-	    		next_safe_point = new Position(getXOnVector(next_point.y - 1, new Position(bbox_right, bbox_bottom), new Position(tried_bbox_right, tried_bbox_bottom)), next_point.y - 1);
-	    	}
-	    } else {
-	    	return new Position(tried_bbox_right, tried_bbox_bottom); // on est arrivé au bout sans mur
-	    }
+        // prochaines valeurs de x et y à partir de laquelle le player va entrer dans une nouvelle tile (quand il sera 1 px dans le mur)
+        let next_wall_x = curr_tile_bbox_left + next_tile_xdist;
+        let next_wall_y = curr_tile_bbox_top + next_tile_ydist;
 
-	    // check la tile en bas du coin bas droit
-	    if (tilemap_get_at_pixel(tilemap, next_point.x, next_point.y)) {
-	    	return next_safe_point;
-	    }
+        // les positions (x,y) du coin du joueur quand il sera dans next_wall_x et next_wall_y
+        let next_xside_point, next_yside_point;
 
-	    if (next_point_side === 'bottom' || next_point_side === 'both') {
-	    	// on doit aussi check le coin bas gauche
-		    // todo : uniquement si il est dans une tile != du coin bas droit (mieux vaut faire un module ou un tilemap_get_at_pixel ? Modulo je pense)
-		    if (tilemap_get_at_pixel(tilemap, next_point.x - (bbox_right - bbox_left), next_point.y)) {
-		    	return next_safe_point;
-		    }
-	    }
-	    if (next_point_side === 'right' || next_point_side === 'both') {
-	    	// on doit aussi check le coin haut droit
-		    // todo : uniquement si il est dans une tile != du coin bas droit
-		    if (tilemap_get_at_pixel(tilemap, next_point.x, next_point.y - (bbox_bottom - bbox_top))) {
-		    	return next_safe_point;
-		    }
-	    }
+        // si tried_bbox_xside ne dépasse pas tried_bbox_xside c'est qu'on ne change pas de tile sur l'axe x donc on a rien a check pour les cotés droit ou gauche
+        if ((xx > 0 && next_wall_x < tried_bbox_xside) || (xx < 0 && next_wall_x > tried_bbox_xside)) {
+            next_xside_point = new Position(next_wall_x, getYOnVector(next_wall_x, start_pos, tried_pos));
+        }
+        if ((yy > 0 && next_wall_y < tried_bbox_yside) || (y < 0 && next_wall_y > tried_bbox_yside)) {
+            next_yside_point = new Position(getXOnVector(next_wall_y, start_pos, tried_pos), next_wall_y);
+        }
 
-	    return findBottomRightPosition(next_point.x, next_point.y);
+        let next_point, next_safe_point, next_point_side;
+        if (next_xside_point && !next_yside_point) {
+            next_point = next_xside_point;
+            next_point_side = 'xside';
+            next_safe_point = new Position(next_point.x - xside_sign, getYOnVector(next_point.x - xside_sign, start_pos, tried_pos));
+
+        } else if (!next_xside_point && next_yside_point) {
+            next_point = next_yside_point;
+            next_point_side = 'yside';
+            next_safe_point = new Position(getXOnVector(next_point.y - yside_sign, start_pos, tried_pos), next_point.y - yside_sign);
+
+        } else if (next_xside_point && next_yside_point) {
+            // next_point = le point qui est 1 px en dehors de la tile courante
+            // donc on checherche pour chacun des 2 points les coordonnées de la tile adjacente et on regarde si c'est notre tile courante
+            if (next_xside_point.x - next_tile_xdist === curr_tile_bbox_left && next_xside_point.y - (next_xside_point.y % tile_size) === curr_tile_bbox_top) {
+                next_point = next_xside_point;
+                next_point_side = 'xside';
+                next_safe_point = new Position(next_point.x - xside_sign, getYOnVector(next_point.x - xside_sign, start_pos, tried_pos));
+
+            } else if (next_yside_point.y - next_tile_ydist === curr_tile_bbox_top && next_yside_point.x - (next_yside_point.x % tile_size) === curr_tile_bbox_left) {
+                next_point = next_yside_point;
+                next_point_side = 'yside';
+                next_safe_point = new Position(getXOnVector(next_point.y - yside_sign, start_pos, tried_pos), next_point.y - yside_sign);
+
+            } else {
+                // le player est pile dans l'angle de la tile courante
+                // donc les 2 points sont les mêmes
+                next_point = next_xside_point;
+                next_point_side = 'both';
+                // todo : les 2 safe points possibles sont les même aussi ?
+                next_safe_point = new Position(getXOnVector(next_point.y - xside_sign, start_pos, tried_pos), next_point.y - xside_sign);
+            }
+        } else {
+            return tried_pos; // on est arrivé au bout sans mur
+        }
+
+        // check la prochaine tile
+        if (tilemap_get_at_pixel(tilemap, next_point.x, next_point.y)) {
+            // collision = stop à la derniere position safe
+            return next_safe_point;
+        }
+
+        if (next_point_side === 'yside' || next_point_side === 'both') {
+            // on veut passer sur une nouvelle tile en bas ou en haut, on a check le coint principal, mais il faut aussi check l'autre coin sur le même coté car il peut passer sur une tile différente
+            // par exemple si on va vers le bas et qu'on a check le coin bas droit, il faut aussi check le coin bas gauche
+            // todo : uniquement si il est dans une tile != du coin bas droit (mieux vaut faire un module ou un tilemap_get_at_pixel ? Modulo je pense)
+            if (tilemap_get_at_pixel(tilemap, next_point.x + ( (bbox_right - bbox_left) * -xside_sign ), next_point.y)) {
+                return next_safe_point;
+            }
+        }
+        if (next_point_side === 'xside' || next_point_side === 'both') {
+            // pareil quand on franchi une tile a droite ou gauche
+            // todo : uniquement si si les 2 points sont dans des tiles différentes
+            if (tilemap_get_at_pixel(tilemap, next_point.x, next_point.y + ( (bbox_bottom - bbox_top) * -yside_sign ))) {
+                return next_safe_point;
+            }
+        }
+
+        return findClosestPosition(next_point.x, next_point.y);
     }
 
-    var last_position = findBottomRightPosition(bbox_right, bbox_bottom);
-    return [last_position.x - (bbox_right - x), last_position.y - (bbox_bottom - y)];
+    var last_position = findClosestPosition(front_bbox_xside, front_bbox_yside);
+
+    return [last_position.x - (xside_offset * xside_sign), last_position.y - (yside_offset * yside_sign)];
 }
 
 /**
@@ -774,6 +823,23 @@ function test() {
         expect,
         description
     );
+
+    ///////// DIRECTION = BOTTOM LEFT
+    var descr_direction = 'to bottom left';
+
+    // simple inside a tile
+    var description = concatLB(descr_direction, 'inside 1 tile');
+
+    var start = makePlayerFromTopRight(tile_size * 2 - 5, tile_size + 5);
+    var tried = makePlayerFromTopRight(tile_size * 2 - 10, tile_size + 10);
+    var expect = tried;
+    addUseCase(
+        start,
+        [],
+        tried,
+        expect,
+        description
+    );
 //*/
     // todo :
     //  - tester les autres directions (peut être pas refaire tous les tests mais au moins quelques un de pertinents)
@@ -1097,28 +1163,46 @@ function _drawUseCase(player, collision_tiles, tried_position, expected_position
 
     var final_is_tried = _isSamePosition(final_player, tried_player);
 
+    var players_count = 0;
+    var players_total = 4;
+
     // player start
+    players_count++;
     ctx.strokeStyle = _player_color;
     _drawPlayer(ctx, player);
+    _drawPlayerArc(ctx, player, players_count, players_total);
 
+    // player tried
+    players_count++;
+    ctx.strokeStyle = _tried_position_color;
     if (!final_is_tried) {
-        // player tried
-        ctx.strokeStyle = _tried_position_color;
         _drawPathBetweenPlayers(ctx, player, tried_player);
         _drawPlayer(ctx, tried_player);
     }
+    _drawPlayerArc(ctx, tried_player, players_count, players_total);
 
     // player expected
+    players_count++;
     ctx.strokeStyle = _expected_position_color;
     _drawPathBetweenPlayers(ctx, player, expected_player);
     _drawPlayer(ctx, expected_player);
+    _drawPlayerArc(ctx, expected_player, players_count, players_total);
 
+    // player end
+    players_count++;
+    ctx.strokeStyle = _final_position_color;
     if (!is_success) {
-        // player end
-        ctx.strokeStyle = _final_position_color;
         _drawPathBetweenPlayers(ctx, player, final_player);
         _drawPlayer(ctx, final_player);
     }
+    _drawPlayerArc(ctx, final_player, players_count, players_total);
+}
+
+function _drawPlayerArc(ctx, player, playerId, maxId) {
+    var arcSize = 2/maxId;
+    var arcStart = (playerId - 1) * arcSize * Math.PI;
+    var arcEnd = arcStart + (arcSize * Math.PI);
+    _drawCircle(ctx, player.x, player.y, 3, arcStart, arcEnd);
 }
 
 function _boundsAddMargin(bounds, mx, my) {
@@ -1159,7 +1243,12 @@ function _drawLine(ctx, startCoord, endCoord) {
     ctx.beginPath();
     ctx.moveTo(startCoord.x, startCoord.y);
     ctx.lineTo(endCoord.x, endCoord.y);
-    ctx.closePath();
+    ctx.stroke();
+}
+
+function _drawCircle(ctx, x, y, radius, start, end) {
+    ctx.beginPath();
+    ctx.arc(x, y, radius, start, end, false);
     ctx.stroke();
 }
 
