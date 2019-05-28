@@ -179,7 +179,7 @@ function getValidPosition(x, y, xx, yy, bbox_left, bbox_top, bbox_right, bbox_bo
         yside_sign = 1;
         yside_offset = bbox_bottom - y;
     } else {
-        // to the left
+        // to the top
         front_bbox_yside = bbox_top;
         next_tile_ydist = -1;
         yside_sign = -1;
@@ -206,22 +206,22 @@ function getValidPosition(x, y, xx, yy, bbox_left, bbox_top, bbox_right, bbox_bo
 
         // si tried_bbox_xside ne dépasse pas tried_bbox_xside c'est qu'on ne change pas de tile sur l'axe x donc on a rien a check pour les cotés droit ou gauche
         if ((xx > 0 && next_wall_x < tried_bbox_xside) || (xx < 0 && next_wall_x > tried_bbox_xside)) {
-            next_xside_point = new Position(next_wall_x, getYOnVector(next_wall_x, start_pos, tried_pos));
+            next_xside_point = new Position(next_wall_x, getYOnSegment(next_wall_x, start_pos, tried_pos));
         }
-        if ((yy > 0 && next_wall_y < tried_bbox_yside) || (y < 0 && next_wall_y > tried_bbox_yside)) {
-            next_yside_point = new Position(getXOnVector(next_wall_y, start_pos, tried_pos), next_wall_y);
+        if ((yy > 0 && next_wall_y < tried_bbox_yside) || (yy < 0 && next_wall_y > tried_bbox_yside)) {
+            next_yside_point = new Position(getXOnSegment(next_wall_y, start_pos, tried_pos), next_wall_y);
         }
 
         let next_point, next_safe_point, next_point_side;
         if (next_xside_point && !next_yside_point) {
             next_point = next_xside_point;
             next_point_side = 'xside';
-            next_safe_point = new Position(next_point.x - xside_sign, getYOnVector(next_point.x - xside_sign, start_pos, tried_pos));
+            next_safe_point = new Position(next_point.x - xside_sign, getYOnSegment(next_point.x - xside_sign, start_pos, tried_pos));
 
         } else if (!next_xside_point && next_yside_point) {
             next_point = next_yside_point;
             next_point_side = 'yside';
-            next_safe_point = new Position(getXOnVector(next_point.y - yside_sign, start_pos, tried_pos), next_point.y - yside_sign);
+            next_safe_point = new Position(getXOnSegment(next_point.y - yside_sign, start_pos, tried_pos), next_point.y - yside_sign);
 
         } else if (next_xside_point && next_yside_point) {
             // next_point = le point qui est 1 px en dehors de la tile courante
@@ -229,20 +229,19 @@ function getValidPosition(x, y, xx, yy, bbox_left, bbox_top, bbox_right, bbox_bo
             if (next_xside_point.x - next_tile_xdist === curr_tile_bbox_left && next_xside_point.y - (next_xside_point.y % tile_size) === curr_tile_bbox_top) {
                 next_point = next_xside_point;
                 next_point_side = 'xside';
-                next_safe_point = new Position(next_point.x - xside_sign, getYOnVector(next_point.x - xside_sign, start_pos, tried_pos));
+                next_safe_point = new Position(next_point.x - xside_sign, getYOnSegment(next_point.x - xside_sign, start_pos, tried_pos));
 
             } else if (next_yside_point.y - next_tile_ydist === curr_tile_bbox_top && next_yside_point.x - (next_yside_point.x % tile_size) === curr_tile_bbox_left) {
                 next_point = next_yside_point;
                 next_point_side = 'yside';
-                next_safe_point = new Position(getXOnVector(next_point.y - yside_sign, start_pos, tried_pos), next_point.y - yside_sign);
+                next_safe_point = new Position(getXOnSegment(next_point.y - yside_sign, start_pos, tried_pos), next_point.y - yside_sign);
 
             } else {
                 // le player est pile dans l'angle de la tile courante
                 // donc les 2 points sont les mêmes
                 next_point = next_xside_point;
                 next_point_side = 'both';
-                // todo : les 2 safe points possibles sont les même aussi ?
-                next_safe_point = new Position(getXOnVector(next_point.y - xside_sign, start_pos, tried_pos), next_point.y - xside_sign);
+                next_safe_point = new Position(next_point.x - xside_sign, getYOnSegment(next_point.x - xside_sign, start_pos, tried_pos));
             }
         } else {
             return tried_pos; // on est arrivé au bout sans mur
@@ -257,17 +256,44 @@ function getValidPosition(x, y, xx, yy, bbox_left, bbox_top, bbox_right, bbox_bo
         if (next_point_side === 'yside' || next_point_side === 'both') {
             // on veut passer sur une nouvelle tile en bas ou en haut, on a check le coint principal, mais il faut aussi check l'autre coin sur le même coté car il peut passer sur une tile différente
             // par exemple si on va vers le bas et qu'on a check le coin bas droit, il faut aussi check le coin bas gauche
-            // todo : uniquement si il est dans une tile != du coin bas droit (mieux vaut faire un module ou un tilemap_get_at_pixel ? Modulo je pense)
-            if (tilemap_get_at_pixel(tilemap, next_point.x + ( (bbox_right - bbox_left) * -xside_sign ), next_point.y)) {
-                return next_safe_point;
+            var other_corner = new Position(
+        		next_point.x + ( (bbox_right - bbox_left) * -xside_sign ),
+        		next_point.y
+    		);
+            var is_same_tile;
+            if (next_point_side === 'yside') {
+            	// plus léger
+            	is_same_tile = curr_tile_bbox_left <= other_corner.x && other_corner.x < curr_tile_bbox_left + tile_size;
+            } else {
+            	var next_point_tile_x = next_point.x - (next_point.x % tile_size);
+            	is_same_tile = next_point_tile_x <= other_corner.x && other_corner.x < next_point_tile_x + tile_size;
+            }
+            if (!is_same_tile) {
+            	// si l'autre coin est dans une tile différente du point déjà testé on check si c'est pas une tile de collision
+	            if (tilemap_get_at_pixel(tilemap, other_corner.x, other_corner.y)) {
+	                return next_safe_point;
+	            }
             }
         }
         if (next_point_side === 'xside' || next_point_side === 'both') {
             // pareil quand on franchi une tile a droite ou gauche
-            // todo : uniquement si si les 2 points sont dans des tiles différentes
-            if (tilemap_get_at_pixel(tilemap, next_point.x, next_point.y + ( (bbox_bottom - bbox_top) * -yside_sign ))) {
-                return next_safe_point;
+            var other_corner = new Position(
+        		next_point.x,
+        		next_point.y + ( (bbox_bottom - bbox_top) * -yside_sign )
+    		);
+            var is_same_tile;
+            if (next_point_side === 'xside') {
+            	// plus léger
+            	is_same_tile = curr_tile_bbox_top <= other_corner.y && other_corner.y < curr_tile_bbox_top + tile_size;
+            } else {
+            	var next_point_tile_y = next_point.y - (next_point.y % tile_size);
+            	is_same_tile = next_point_tile_y <= other_corner.y && other_corner.y < next_point_tile_y + tile_size;
             }
+            if (!is_same_tile) {
+	            if (tilemap_get_at_pixel(tilemap, other_corner.x, other_corner.y)) {
+	                return next_safe_point;
+	            }
+	        }
         }
 
         return findClosestPosition(next_point.x, next_point.y);
@@ -344,7 +370,7 @@ function test() {
     var tile = findTile(1,1);
     var start = makePlayerFromBottomLeft(tile.x_min + 3, tile.y_min - 5);
     var tried = makePlayerFromBottomLeft(tile.x_min + 5, tile.y_min + 5);
-    var expect = makePlayerFromBottomLeft(getXOnVector(tile.y_min - 1, new Position(start.bbox_left, start.bbox_bottom), new Position(tried.bbox_left, tried.bbox_bottom)), tile.y_min - 1);
+    var expect = makePlayerFromBottomLeft(getXOnSegment(tile.y_min - 1, new Position(start.bbox_left, start.bbox_bottom), new Position(tried.bbox_left, tried.bbox_bottom)), tile.y_min - 1);
     addUseCase(
         start,
         [tile],
@@ -357,6 +383,18 @@ function test() {
     var start = makePlayerFromBottomLeft(tile_size + 3, tile_size - 5);
     var tried = makePlayerFromBottomLeft(tile_size + 5, tile_size + 5);
     var expect = tried;
+    addUseCase(
+        start,
+        [tile],
+        tried,
+        expect,
+        description
+    );
+
+    var tile = findTile(1,1);
+    var start = makePlayerFromTopRight(tile.x_min - 3, tile.y_min + 5);
+    var tried = makePlayerFromTopRight(tile.x_min + 5, tile.y_min + 10);
+    var expect = makePlayerFromTopRight(tile.x_min - 1, getYOnSegment(tile.x_min - 1, new Position(start.bbox_right, start.bbox_top), new Position(tried.bbox_right, tried.bbox_top)));
     addUseCase(
         start,
         [tile],
@@ -383,7 +421,7 @@ function test() {
     var tile = findTile(1,1);
     var start = makePlayerFromBottomLeft(tile.x_min - 3, tile.y_min - 5);
     var tried = makePlayerFromBottomLeft(tile.x_min + 5, tile.y_min + 3);
-    var expect = makePlayerFromBottomLeft(getXOnVector(tile.y_min - 1, new Position(start.bbox_left, start.bbox_bottom), new Position(tried.bbox_left, tried.bbox_bottom)), tile.y_min - 1);
+    var expect = makePlayerFromBottomLeft(getXOnSegment(tile.y_min - 1, new Position(start.bbox_left, start.bbox_bottom), new Position(tried.bbox_left, tried.bbox_bottom)), tile.y_min - 1);
     addUseCase(
         start,
         [tile],
@@ -407,7 +445,7 @@ function test() {
     var tile = findTile(1,1);
     var start = makePlayerFromBottomLeft(tile.x_min - 3, tile.y_min - 5);
     var tried = makePlayerFromBottomLeft(tile.x_min + 5, tile.y_min + 3);
-    var expect = makePlayerFromBottomLeft(getXOnVector(tile.y_min - 1, new Position(start.bbox_left, start.bbox_bottom), new Position(tried.bbox_left, tried.bbox_bottom)), tile.y_min - 1);
+    var expect = makePlayerFromBottomLeft(getXOnSegment(tile.y_min - 1, new Position(start.bbox_left, start.bbox_bottom), new Position(tried.bbox_left, tried.bbox_bottom)), tile.y_min - 1);
     addUseCase(
         start,
         [findTile(0,1), tile],
@@ -434,7 +472,7 @@ function test() {
     var tile = findTile(1,1);
     var start = makePlayerFromBottomLeft(tile.x_min - 8, tile.y_min - 3);
     var tried = makePlayerFromBottomLeft(tile.x_min + 3, tile.y_min + 8);
-    var expect = makePlayerFromBottomLeft(getXOnVector(tile.y_min - 1, new Position(start.bbox_left, start.bbox_bottom), new Position(tried.bbox_left, tried.bbox_bottom)), tile.y_min - 1);
+    var expect = makePlayerFromBottomLeft(getXOnSegment(tile.y_min - 1, new Position(start.bbox_left, start.bbox_bottom), new Position(tried.bbox_left, tried.bbox_bottom)), tile.y_min - 1);
     addUseCase(
         start,
         [tile],
@@ -446,7 +484,19 @@ function test() {
     var tile = findTile(0,1);
     var start = makePlayerFromBottomLeft(tile_size - 8, tile_size - 3);
     var tried = makePlayerFromBottomLeft(tile_size + 3, tile_size + 8);
-    var expect = makePlayerFromBottomLeft(getXOnVector(tile_size - 1, new Position(start.bbox_left, start.bbox_bottom), new Position(tried.bbox_left, tried.bbox_bottom)), tile_size - 1);
+    var expect = makePlayerFromBottomLeft(getXOnSegment(tile_size - 1, new Position(start.bbox_left, start.bbox_bottom), new Position(tried.bbox_left, tried.bbox_bottom)), tile_size - 1);
+    addUseCase(
+        start,
+        [tile],
+        tried,
+        expect,
+        description
+    );
+
+    var tile = findTile(1,1);
+    var start = makePlayerFromTopRight(tile.x_min - 3, tile.y_max - 8);
+    var tried = makePlayerFromTopRight(tile.x_min + 8, tile.y_max + 3);
+    var expect = makePlayerFromTopRight(tile.x_min - 1, getYOnSegment(tile.x_min - 1, new Position(start.bbox_right, start.bbox_top), new Position(tried.bbox_right, tried.bbox_top)));
     addUseCase(
         start,
         [tile],
@@ -458,7 +508,7 @@ function test() {
     var tile = findTile(1,1);
     var start = makePlayerFromBottomLeft(tile.x_min - 8, tile.y_min - 3);
     var tried = makePlayerFromBottomLeft(tile.x_min + 3, tile.y_min + 8);
-    var expect = makePlayerFromBottomLeft(getXOnVector(tile.y_min - 1, new Position(start.bbox_left, start.bbox_bottom), new Position(tried.bbox_left, tried.bbox_bottom)), tile.y_min - 1);
+    var expect = makePlayerFromBottomLeft(getXOnSegment(tile.y_min - 1, new Position(start.bbox_left, start.bbox_bottom), new Position(tried.bbox_left, tried.bbox_bottom)), tile.y_min - 1);
     addUseCase(
         start,
         [findTile(0,1), tile],
@@ -630,7 +680,7 @@ function test() {
     var tile = findTile(1,1);
     var start = makePlayerFromBottomRight(tile.x_max - 20, tile.y_min - 2);
     var tried = makePlayerFromTopRight(tile.x_max + 2, tile.y_min + 10);
-    var expect = makePlayerFromBottomRight(getXOnVector(tile.y_min - 1, new Position(start.bbox_right, start.bbox_bottom), new Position(tried.bbox_right, tried.bbox_bottom)), tile.y_min - 1);
+    var expect = makePlayerFromBottomRight(getXOnSegment(tile.y_min - 1, new Position(start.bbox_right, start.bbox_bottom), new Position(tried.bbox_right, tried.bbox_bottom)), tile.y_min - 1);
     addUseCase(
         start,
         [tile],
@@ -642,7 +692,7 @@ function test() {
     var tile = findTile(2,1);
     var start = makePlayerFromBottomRight(tile_size * 2 - 20, tile_size - 2);
     var tried = makePlayerFromTopRight(tile_size * 2 + 2, tile_size + 10);
-    var expect = makePlayerFromBottomRight(tile.x_min - 1, getYOnVector(tile.x_min - 1, new Position(start.bbox_right, start.bbox_bottom), new Position(tried.bbox_right, tried.bbox_bottom)));
+    var expect = makePlayerFromBottomRight(tile.x_min - 1, getYOnSegment(tile.x_min - 1, new Position(start.bbox_right, start.bbox_bottom), new Position(tried.bbox_right, tried.bbox_bottom)));
     addUseCase(
         start,
         [tile],
@@ -654,7 +704,7 @@ function test() {
     var tile = findTile(1,1);
     var start = makePlayerFromBottomRight(tile.x_max - 20, tile.y_min - 2);
     var tried = makePlayerFromTopRight(tile.x_max + 2, tile.y_min + 10);
-    var expect = makePlayerFromBottomRight(getXOnVector(tile.y_min - 1, new Position(start.bbox_right, start.bbox_bottom), new Position(tried.bbox_right, tried.bbox_bottom)), tile.y_min - 1);
+    var expect = makePlayerFromBottomRight(getXOnSegment(tile.y_min - 1, new Position(start.bbox_right, start.bbox_bottom), new Position(tried.bbox_right, tried.bbox_bottom)), tile.y_min - 1);
     addUseCase(
         start,
         [tile, findTile(2,1)],
@@ -692,7 +742,7 @@ function test() {
     var tile = findTile(1,1);
     var start = makePlayerFromBottomRight(tile.x_max - 10, tile.y_min - 10);
     var tried = makePlayerFromBottomRight(tile.x_max + 5, tile.y_min + 15);
-    var expect = makePlayerFromBottomRight(getXOnVector(tile.y_min - 1, new Position(start.bbox_right, start.bbox_bottom), new Position(tried.bbox_right, tried.bbox_bottom)), tile.y_min - 1);
+    var expect = makePlayerFromBottomRight(getXOnSegment(tile.y_min - 1, new Position(start.bbox_right, start.bbox_bottom), new Position(tried.bbox_right, tried.bbox_bottom)), tile.y_min - 1);
     addUseCase(
         start,
         [tile],
@@ -704,7 +754,7 @@ function test() {
     var tile = findTile(2,1);
     var start = makePlayerFromBottomRight(tile_size * 2 - 5, tile_size - 5);
     var tried = makePlayerFromBottomRight(tile_size * 2 + 5, tile_size + 15);
-    var expect = makePlayerFromBottomRight(tile_size * 2 - 1, getYOnVector(tile_size * 2 - 1,  new Position(start.bbox_right, start.bbox_bottom), new Position(tried.bbox_right, tried.bbox_bottom)));
+    var expect = makePlayerFromBottomRight(tile_size * 2 - 1, getYOnSegment(tile_size * 2 - 1,  new Position(start.bbox_right, start.bbox_bottom), new Position(tried.bbox_right, tried.bbox_bottom)));
     addUseCase(
         start,
         [tile],
@@ -716,7 +766,7 @@ function test() {
     var tile = findTile(2,1);
     var start = makePlayerFromBottomRight(tile_size * 2 - 10, tile_size - 5);
     var tried = makePlayerFromBottomRight(tile_size * 2 + 5, tile_size + 15);
-    var expect = makePlayerFromBottomRight(tile.x_min - 1, getYOnVector(tile_size * 2 - 1, new Position(start.bbox_right, start.bbox_bottom), new Position(tried.bbox_right, tried.bbox_bottom)));
+    var expect = makePlayerFromBottomRight(tile.x_min - 1, getYOnSegment(tile_size * 2 - 1, new Position(start.bbox_right, start.bbox_bottom), new Position(tried.bbox_right, tried.bbox_bottom)));
     addUseCase(
         start,
         [tile],
@@ -728,7 +778,7 @@ function test() {
     var tile = findTile(2,1);
     var start = makePlayerFromBottomRight(tile_size * 2 - 5, tile_size - 10);
     var tried = makePlayerFromBottomRight(tile_size * 2 + 10, tile_size + 15);
-    var expect = makePlayerFromBottomRight(getXOnVector(tile.y_min - 1, new Position(start.bbox_right, start.bbox_bottom), new Position(tried.bbox_right, tried.bbox_bottom)), tile.y_min - 1);
+    var expect = makePlayerFromBottomRight(getXOnSegment(tile.y_min - 1, new Position(start.bbox_right, start.bbox_bottom), new Position(tried.bbox_right, tried.bbox_bottom)), tile.y_min - 1);
     addUseCase(
         start,
         [tile],
@@ -740,7 +790,7 @@ function test() {
     var tile = findTile(2,0);
     var start = makePlayerFromBottomRight(tile_size * 2 - 10, tile_size - 10);
     var tried = makePlayerFromBottomRight(tile_size * 2 + 5, tile_size + 15);
-    var expect = makePlayerFromBottomRight(tile.x_min - 1, getYOnVector(tile.x_min - 1, new Position(start.bbox_right, start.bbox_bottom), new Position(tried.bbox_right, tried.bbox_bottom)));
+    var expect = makePlayerFromBottomRight(tile.x_min - 1, getYOnSegment(tile.x_min - 1, new Position(start.bbox_right, start.bbox_bottom), new Position(tried.bbox_right, tried.bbox_bottom)));
     addUseCase(
         start,
         [tile],
@@ -767,7 +817,7 @@ function test() {
     var tile = findTile(1,1);
     var start = makePlayerFromBottomRight(tile.x_max - 10, tile.y_min - 10);
     var tried = makePlayerFromBottomRight(tile.x_max + 5, tile.y_min + 5);
-    var expect = makePlayerFromBottomRight(getXOnVector(tile.y_min - 1, new Position(start.bbox_right, start.bbox_bottom), new Position(tried.bbox_right, tried.bbox_bottom)), tile.y_min - 1);
+    var expect = makePlayerFromBottomRight(getXOnSegment(tile.y_min - 1, new Position(start.bbox_right, start.bbox_bottom), new Position(tried.bbox_right, tried.bbox_bottom)), tile.y_min - 1);
     addUseCase(
         start,
         [tile],
@@ -791,7 +841,7 @@ function test() {
     var tile = findTile(2,1);
     var start = makePlayerFromBottomRight(tile_size * 2 - 10, tile_size - 5);
     var tried = makePlayerFromBottomRight(tile_size * 2 + 5, tile_size + 10);
-    var expect = makePlayerFromBottomRight(tile.x_min - 1, getYOnVector(tile_size * 2 - 1, new Position(start.bbox_right, start.bbox_bottom), new Position(tried.bbox_right, tried.bbox_bottom)));
+    var expect = makePlayerFromBottomRight(tile.x_min - 1, getYOnSegment(tile_size * 2 - 1, new Position(start.bbox_right, start.bbox_bottom), new Position(tried.bbox_right, tried.bbox_bottom)));
     addUseCase(
         start,
         [tile],
@@ -803,7 +853,7 @@ function test() {
     var tile = findTile(2,1);
     var start = makePlayerFromBottomRight(tile_size * 2 - 5, tile_size - 10);
     var tried = makePlayerFromBottomRight(tile_size * 2 + 10, tile_size + 5);
-    var expect = makePlayerFromBottomRight(getXOnVector(tile.y_min - 1, new Position(start.bbox_right, start.bbox_bottom), new Position(tried.bbox_right, tried.bbox_bottom)), tile.y_min - 1);
+    var expect = makePlayerFromBottomRight(getXOnSegment(tile.y_min - 1, new Position(start.bbox_right, start.bbox_bottom), new Position(tried.bbox_right, tried.bbox_bottom)), tile.y_min - 1);
     addUseCase(
         start,
         [tile],
@@ -815,7 +865,7 @@ function test() {
     var tile = findTile(2,0);
     var start = makePlayerFromBottomRight(tile_size * 2 - 10, tile_size - 10);
     var tried = makePlayerFromBottomRight(tile_size * 2 + 5, tile_size + 5);
-    var expect = makePlayerFromBottomRight(tile.x_min - 1, getYOnVector(tile.x_min - 1, new Position(start.bbox_right, start.bbox_bottom), new Position(tried.bbox_right, tried.bbox_bottom)));
+    var expect = makePlayerFromBottomRight(tile.x_min - 1, getYOnSegment(tile.x_min - 1, new Position(start.bbox_right, start.bbox_bottom), new Position(tried.bbox_right, tried.bbox_bottom)));
     addUseCase(
         start,
         [tile],
@@ -824,10 +874,21 @@ function test() {
         description
     );
 
+    var tile = findTile(2,0);
+    var start = makePlayerFromBottomRight(tile_size * 2 - 10, tile_size - 10);
+    var tried = makePlayerFromBottomRight(tile_size * 2 + 5, tile_size + 5);
+    var expect = makePlayerFromBottomRight(tile.x_min - 1, getYOnSegment(tile.x_min - 1, new Position(start.bbox_right, start.bbox_bottom), new Position(tried.bbox_right, tried.bbox_bottom)));
+    addUseCase(
+        start,
+        [tile, findTile(1,1)],
+        tried,
+        expect,
+        description
+    );
+
     ///////// DIRECTION = BOTTOM LEFT
     var descr_direction = 'to bottom left';
 
-    // simple inside a tile
     var description = concatLB(descr_direction, 'inside 1 tile');
 
     var start = makePlayerFromTopRight(tile_size * 2 - 5, tile_size + 5);
@@ -840,10 +901,543 @@ function test() {
         expect,
         description
     );
+
+    var description = concatLB(descr_direction, '1 tile to 2');
+
+    var tile = findTile(1,1);
+    var start = makePlayerFromTopLeft(tile.x_max + 3, tile.y_min + 5);
+    var tried = makePlayerFromTopLeft(tile.x_max - 5, tile.y_min + 10);
+    var expect = makePlayerFromTopLeft(tile.x_max + 1, getYOnSegment(tile.x_max + 1, new Position(start.bbox_left, start.bbox_top), new Position(tried.bbox_left, tried.bbox_top)));
+    addUseCase(
+        start,
+        [tile],
+        tried,
+        expect,
+        description
+    );
+
+    var description = concatLB(descr_direction, '2 tiles to 2');
+
+    var tile = findTile(2,2);
+    var start = makePlayerFromBottomRight(tile.x_max + 3, tile.y_min - 5);
+    var tried = makePlayerFromBottomRight(tile.x_max - 5, tile.y_min + 3);
+    var expect = makePlayerFromBottomRight(getXOnSegment(tile.y_min - 1, new Position(start.bbox_right, start.bbox_bottom), new Position(tried.bbox_right, tried.bbox_bottom)), tile.y_min - 1);
+    addUseCase(
+        start,
+        [tile],
+        tried,
+        expect,
+        description
+    );
+
+    var description = concatLB(descr_direction, '1 tile to 4');
+
+    var tile = findTile(2,1);
+    var start = makePlayerFromBottomLeft(tile.x_max + 5, tile.y_min - 10);
+    var tried = makePlayerFromBottomLeft(tile.x_max - 10, tile.y_min + 5);
+    var expect = makePlayerFromBottomLeft(getXOnSegment(tile.y_min - 1, new Position(start.bbox_left, start.bbox_bottom), new Position(tried.bbox_left, tried.bbox_bottom)), tile.y_min - 1);
+    addUseCase(
+        start,
+        [tile],
+        tried,
+        expect,
+        description
+    );
+
+    var description = concatLB(descr_direction, '1 tile to 4 (perfect angle)');
+
+    var tile = findTile(2,1);
+    var start = makePlayerFromBottomLeft(tile.x_max + 5, tile.y_min - 5);
+    var tried = makePlayerFromBottomLeft(tile.x_max - 5, tile.y_min + 5);
+    var expect = makePlayerFromBottomLeft(getXOnSegment(tile.y_min - 1, new Position(start.bbox_left, start.bbox_bottom), new Position(tried.bbox_left, tried.bbox_bottom)), tile.y_min - 1);
+    addUseCase(
+        start,
+        [tile],
+        tried,
+        expect,
+        description
+    );
+
+    var description = concatLB(descr_direction, '2 tiles to 1 other, CROSSING other tile');
+
+    var tile = findTile(1,1);
+    var start = makePlayerFromBottomRight(tile.x_min + 8, tile.y_min - 3);
+    var tried = makePlayerFromBottomRight(tile.x_min - 3, tile.y_min + 8);
+    var expect = makePlayerFromBottomRight(getXOnSegment(tile.y_min - 1, new Position(start.bbox_right, start.bbox_bottom), new Position(tried.bbox_right, tried.bbox_bottom)), tile.y_min - 1);
+    addUseCase(
+        start,
+        [tile],
+        tried,
+        expect,
+        description
+    );
+
+    ///////// DIRECTION = TOP LEFT
+    var descr_direction = 'to top left';
+
+    var description = concatLB(descr_direction, 'inside 1 tile');
+
+    var start = makePlayerFromTopRight(tile_size * 2 - 5, tile_size + 10);
+    var tried = makePlayerFromTopRight(tile_size * 2 - 10, tile_size + 5);
+    var expect = tried;
+    addUseCase(
+        start,
+        [],
+        tried,
+        expect,
+        description
+    );
+
+    var description = concatLB(descr_direction, '1 tile to 2');
+
+    var tile = findTile(1,1);
+    var start = makePlayerFromTopLeft(tile.x_max + 3, tile.y_min + 10);
+    var tried = makePlayerFromTopLeft(tile.x_max - 5, tile.y_min + 5);
+    var expect = makePlayerFromTopLeft(tile.x_max + 1, getYOnSegment(tile.x_max + 1, new Position(start.bbox_left, start.bbox_top), new Position(tried.bbox_left, tried.bbox_top)));
+    addUseCase(
+        start,
+        [tile],
+        tried,
+        expect,
+        description
+    );
+
+    var description = concatLB(descr_direction, '2 tiles to 2');
+
+    var tile = findTile(2,2);
+    var start = makePlayerFromTopRight(tile.x_max + 3, tile.y_max + 5);
+    var tried = makePlayerFromTopRight(tile.x_max - 5, tile.y_max - 3);
+    var expect = makePlayerFromTopRight(getXOnSegment(tile.y_max + 1, new Position(start.bbox_right, start.bbox_top), new Position(tried.bbox_right, tried.bbox_top)), tile.y_max + 1);
+    addUseCase(
+        start,
+        [tile],
+        tried,
+        expect,
+        description
+    );
+
+    var description = concatLB(descr_direction, '1 tile to 4');
+
+    var tile = findTile(2,1);
+    var start = makePlayerFromTopLeft(tile.x_max + 5, tile.y_max + 10);
+    var tried = makePlayerFromTopLeft(tile.x_max - 10, tile.y_max - 5);
+    var expect = makePlayerFromTopLeft(getXOnSegment(tile.y_max + 1, new Position(start.bbox_left, start.bbox_top), new Position(tried.bbox_left, tried.bbox_top)), tile.y_max + 1);
+    addUseCase(
+        start,
+        [tile],
+        tried,
+        expect,
+        description
+    );
+
+    var description = concatLB(descr_direction, '1 tile to 4 (perfect angle)');
+
+    var tile = findTile(2,1);
+    var start = makePlayerFromTopLeft(tile.x_max + 5, tile.y_max + 5);
+    var tried = makePlayerFromTopLeft(tile.x_max - 5, tile.y_max - 5);
+    var expect = makePlayerFromTopLeft(getXOnSegment(tile.y_max + 1, new Position(start.bbox_left, start.bbox_top), new Position(tried.bbox_left, tried.bbox_top)), tile.y_max + 1);
+    addUseCase(
+        start,
+        [tile],
+        tried,
+        expect,
+        description
+    );
+
+    var description = concatLB(descr_direction, '2 tiles to 1 other, CROSSING other tile');
+
+    var tile = findTile(1,2);
+    var start = makePlayerFromBottomLeft(tile.x_max + 3, tile.y_min + 8);
+    var tried = makePlayerFromBottomLeft(tile.x_max - 8, tile.y_min - 3);
+    var expect = makePlayerFromBottomLeft(tile.x_max + 1, getYOnSegment(tile.x_max + 1, new Position(start.bbox_left, start.bbox_bottom), new Position(tried.bbox_left, tried.bbox_bottom)));
+    addUseCase(
+        start,
+        [tile],
+        tried,
+        expect,
+        description
+    );
+
+    var tile = findTile(2,2);
+    var start = makePlayerFromTopRight(tile.x_min + 8, tile.y_max + 3);
+    var tried = makePlayerFromTopRight(tile.x_min - 3, tile.y_max - 8);
+    var expect = makePlayerFromTopRight(getXOnSegment(tile.y_max + 1, new Position(start.bbox_right, start.bbox_top), new Position(tried.bbox_right, tried.bbox_top)), tile.y_max + 1);
+    addUseCase(
+        start,
+        [tile],
+        tried,
+        expect,
+        description
+    );
+
+    ///////// DIRECTION = TOP RIGHT
+    var descr_direction = 'to top right';
+
+    var description = concatLB(descr_direction, 'inside 1 tile');
+
+    var start = makePlayerFromTopLeft(tile_size * 2 + 5, tile_size + 10);
+    var tried = makePlayerFromTopLeft(tile_size * 2 + 10, tile_size + 5);
+    var expect = tried;
+    addUseCase(
+        start,
+        [],
+        tried,
+        expect,
+        description
+    );
+
+    var description = concatLB(descr_direction, '1 tile to 2');
+
+    var tile = findTile(2,1);
+    var start = makePlayerFromTopRight(tile.x_min - 3, tile.y_min + 10);
+    var tried = makePlayerFromTopRight(tile.x_min + 5, tile.y_min + 5);
+    var expect = makePlayerFromTopRight(tile.x_min - 1, getYOnSegment(tile.x_min - 1, new Position(start.bbox_right, start.bbox_top), new Position(tried.bbox_right, tried.bbox_top)));
+    addUseCase(
+        start,
+        [tile],
+        tried,
+        expect,
+        description
+    );
+
+    var description = concatLB(descr_direction, '2 tiles to 2');
+
+    var tile = findTile(2,2);
+    var start = makePlayerFromTopLeft(tile.x_min - 3, tile.y_max + 5);
+    var tried = makePlayerFromTopLeft(tile.x_min + 5, tile.y_max - 3);
+    var expect = makePlayerFromTopLeft(getXOnSegment(tile.y_max + 1, new Position(start.bbox_left, start.bbox_top), new Position(tried.bbox_left, tried.bbox_top)), tile.y_max + 1);
+    addUseCase(
+        start,
+        [tile],
+        tried,
+        expect,
+        description
+    );
+
+    var description = concatLB(descr_direction, '1 tile to 4');
+
+    var tile = findTile(2,1);
+    var start = makePlayerFromTopRight(tile.x_min - 5, tile.y_max + 10);
+    var tried = makePlayerFromTopRight(tile.x_min + 10, tile.y_max - 5);
+    var expect = makePlayerFromTopRight(getXOnSegment(tile.y_max + 1, new Position(start.bbox_right, start.bbox_top), new Position(tried.bbox_right, tried.bbox_top)), tile.y_max + 1);
+    addUseCase(
+        start,
+        [tile],
+        tried,
+        expect,
+        description
+    );
+
+    var description = concatLB(descr_direction, '1 tile to 4 (perfect angle)');
+
+    var tile = findTile(2,1);
+    var start = makePlayerFromTopRight(tile.x_min - 5, tile.y_max + 5);
+    var tried = makePlayerFromTopRight(tile.x_min + 5, tile.y_max - 5);
+    var expect = makePlayerFromTopRight(getXOnSegment(tile.y_max + 1, new Position(start.bbox_right, start.bbox_top), new Position(tried.bbox_right, tried.bbox_top)), tile.y_max + 1);
+    addUseCase(
+        start,
+        [tile],
+        tried,
+        expect,
+        description
+    );
+
+    var description = concatLB(descr_direction, '2 tiles to 1 other, CROSSING other tile');
+
+    var tile = findTile(1,2);
+    var start = makePlayerFromBottomRight(tile.x_min - 3, tile.y_min + 8);
+    var tried = makePlayerFromBottomRight(tile.x_min + 8, tile.y_min - 3);
+    var expect = makePlayerFromBottomRight(tile.x_min - 1, getYOnSegment(tile.x_min - 1, new Position(start.bbox_right, start.bbox_bottom), new Position(tried.bbox_right, tried.bbox_bottom)));
+    addUseCase(
+        start,
+        [tile],
+        tried,
+        expect,
+        description
+    );
+
+    var tile = findTile(2,2);
+    var start = makePlayerFromTopLeft(tile.x_max - 8, tile.y_max + 3);
+    var tried = makePlayerFromTopLeft(tile.x_max + 3, tile.y_max - 8);
+    var expect = makePlayerFromTopLeft(getXOnSegment(tile.y_max + 1, new Position(start.bbox_left, start.bbox_top), new Position(tried.bbox_left, tried.bbox_top)), tile.y_max + 1);
+    addUseCase(
+        start,
+        [tile],
+        tried,
+        expect,
+        description
+    );
+
+    ///////// DIRECTION = TOP ONLY
+    var descr_direction = 'to top only';
+
+    var description = concatLB(descr_direction, 'inside 1 tile');
+
+    var start = makePlayerFromTopLeft(tile_size * 2 + 10, tile_size + 10);
+    var tried = makePlayerFromTopLeft(start.bbox_left, tile_size + 5);
+    var expect = tried;
+    addUseCase(
+        start,
+        [],
+        tried,
+        expect,
+        description
+    );
+
+    var description = concatLB(descr_direction, '1 tile to 2 tiles');
+
+    var start = makePlayerFromTopLeft(tile_size * 2 + 10, tile_size + 5);
+    var tried = makePlayerFromTopLeft(start.bbox_left, tile_size - 5);
+    var expect = tried;
+    addUseCase(
+        start,
+        [],
+        tried,
+        expect,
+        description
+    );
+
+    var tile = findTile(2,2);
+    var start = makePlayerFromTopLeft(tile.x_min + 10, tile.y_max + 5);
+    var tried = makePlayerFromTopLeft(start.bbox_left, tile.y_max - 5);
+    var expect = makePlayerFromTopLeft(start.bbox_left, tile.y_max + 1);;
+    addUseCase(
+        start,
+        [tile],
+        tried,
+        expect,
+        description
+    );
+
+    var description = concatLB(descr_direction, '2 tiles to 4 tiles');
+
+    var tile = findTile(2,2);
+    var start = makePlayerFromTopLeft(tile.x_max - 10, tile.y_max + 5);
+    var tried = makePlayerFromTopLeft(start.bbox_left, tile.y_max - 5);
+    var expect = makePlayerFromTopLeft(start.bbox_left, tile.y_max + 1);
+    addUseCase(
+        start,
+        [tile],
+        tried,
+        expect,
+        description
+    );
+
+    var tile = findTile(2,2);
+    var start = makePlayerFromTopLeft(tile.x_min - 10, tile.y_max + 5);
+    var tried = makePlayerFromTopLeft(start.bbox_left, tile.y_max - 5);
+    var expect = makePlayerFromTopLeft(start.bbox_left, tile.y_max + 1);
+    addUseCase(
+        start,
+        [tile],
+        tried,
+        expect,
+        description
+    );
+
+    ///////// DIRECTION = BOTTOM ONLY
+    var descr_direction = 'to bottom only';
+
+    var description = concatLB(descr_direction, 'inside 1 tile');
+
+    var start = makePlayerFromBottomLeft(tile_size * 2 + 10, tile_size * 2 - 10);
+    var tried = makePlayerFromBottomLeft(start.bbox_left, tile_size * 2 - 5);
+    var expect = tried;
+    addUseCase(
+        start,
+        [],
+        tried,
+        expect,
+        description
+    );
+
+    var description = concatLB(descr_direction, '1 tile to 2 tiles');
+
+    var start = makePlayerFromBottomLeft(tile_size * 2 + 10, tile_size * 2 - 5);
+    var tried = makePlayerFromBottomLeft(start.bbox_left, tile_size * 2 + 5);
+    var expect = tried;
+    addUseCase(
+        start,
+        [],
+        tried,
+        expect,
+        description
+    );
+
+    var tile = findTile(2,2);
+    var start = makePlayerFromBottomLeft(tile.x_min + 10, tile.y_min - 5);
+    var tried = makePlayerFromBottomLeft(start.bbox_left, tile.y_min + 5);
+    var expect = makePlayerFromBottomLeft(start.bbox_left, tile.y_min - 1);;
+    addUseCase(
+        start,
+        [tile],
+        tried,
+        expect,
+        description
+    );
+
+    var description = concatLB(descr_direction, '2 tiles to 4 tiles');
+
+    var tile = findTile(2,2);
+    var start = makePlayerFromBottomLeft(tile.x_max - 10, tile.y_min - 5);
+    var tried = makePlayerFromBottomLeft(start.bbox_left, tile.y_min + 5);
+    var expect = makePlayerFromBottomLeft(start.bbox_left, tile.y_min - 1);
+    addUseCase(
+        start,
+        [tile],
+        tried,
+        expect,
+        description
+    );
+
+    var tile = findTile(2,2);
+    var start = makePlayerFromBottomLeft(tile.x_min - 10, tile.y_min - 5);
+    var tried = makePlayerFromBottomLeft(start.bbox_left, tile.y_min + 5);
+    var expect = makePlayerFromBottomLeft(start.bbox_left, tile.y_min - 1);
+    addUseCase(
+        start,
+        [tile],
+        tried,
+        expect,
+        description
+    );
+
+    ///////// DIRECTION = RIGHT ONLY
+    var descr_direction = 'to right only';
+
+    var description = concatLB(descr_direction, 'inside 1 tile');
+
+    var start = makePlayerFromTopRight(tile_size * 2 - 15, tile_size * 2 + 10);
+    var tried = makePlayerFromTopRight(tile_size * 2 - 10, start.bbox_top);
+    var expect = tried;
+    addUseCase(
+        start,
+        [],
+        tried,
+        expect,
+        description
+    );
+
+    var description = concatLB(descr_direction, '1 tile to 2 tiles');
+
+    var start = makePlayerFromTopRight(tile_size * 2 - 5, tile_size * 2 + 10);
+    var tried = makePlayerFromTopRight(tile_size * 2 + 5, start.bbox_top);
+    var expect = tried;
+    addUseCase(
+        start,
+        [],
+        tried,
+        expect,
+        description
+    );
+
+    var tile = findTile(2,2);
+    var start = makePlayerFromTopRight(tile.x_min - 5, tile.y_min + 10);
+    var tried = makePlayerFromTopRight(tile.x_min + 5, start.bbox_top);
+    var expect = makePlayerFromTopRight(tile.x_min - 1, start.bbox_top);
+    addUseCase(
+        start,
+        [tile],
+        tried,
+        expect,
+        description
+    );
+
+    var description = concatLB(descr_direction, '2 tiles to 4 tiles');
+
+    var tile = findTile(2,2);
+    var start = makePlayerFromTopRight(tile.x_min - 5, tile.y_min - 10);
+    var tried = makePlayerFromTopRight(tile.x_min + 5, start.bbox_top);
+    var expect = makePlayerFromTopRight(tile.x_min - 1, start.bbox_top);
+    addUseCase(
+        start,
+        [tile],
+        tried,
+        expect,
+        description
+    );
+
+    var tile = findTile(2,2);
+    var start = makePlayerFromTopRight(tile.x_min - 5, tile.y_max - 10);
+    var tried = makePlayerFromTopRight(tile.x_min + 5, start.bbox_top);
+    var expect = makePlayerFromTopRight(tile.x_min - 1, start.bbox_top);
+    addUseCase(
+        start,
+        [tile],
+        tried,
+        expect,
+        description
+    );
+
+    ///////// DIRECTION = LEFT ONLY
+    var descr_direction = 'to left only';
+
+    var description = concatLB(descr_direction, 'inside 1 tile');
+
+    var start = makePlayerFromTopLeft(tile_size * 2 + 15, tile_size * 2 + 10);
+    var tried = makePlayerFromTopLeft(tile_size * 2 + 10, start.bbox_top);
+    var expect = tried;
+    addUseCase(
+        start,
+        [],
+        tried,
+        expect,
+        description
+    );
+
+    var description = concatLB(descr_direction, '1 tile to 2 tiles');
+
+    var start = makePlayerFromTopLeft(tile_size * 2 + 5, tile_size * 2 + 10);
+    var tried = makePlayerFromTopLeft(tile_size * 2 - 5, start.bbox_top);
+    var expect = tried;
+    addUseCase(
+        start,
+        [],
+        tried,
+        expect,
+        description
+    );
+
+    var tile = findTile(2,2);
+    var start = makePlayerFromTopLeft(tile.x_max + 5, tile.y_min + 10);
+    var tried = makePlayerFromTopLeft(tile.x_max - 5, start.bbox_top);
+    var expect = makePlayerFromTopLeft(tile.x_max + 1, start.bbox_top);
+    addUseCase(
+        start,
+        [tile],
+        tried,
+        expect,
+        description
+    );
+
+    var description = concatLB(descr_direction, '2 tiles to 4 tiles');
+
+    var tile = findTile(2,2);
+    var start = makePlayerFromTopLeft(tile.x_max + 5, tile.y_min - 10);
+    var tried = makePlayerFromTopLeft(tile.x_max - 5, start.bbox_top);
+    var expect = makePlayerFromTopLeft(tile.x_max + 1, start.bbox_top);
+    addUseCase(
+        start,
+        [tile],
+        tried,
+        expect,
+        description
+    );
+
+    var tile = findTile(2,2);
+    var start = makePlayerFromTopLeft(tile.x_max + 5, tile.y_max - 10);
+    var tried = makePlayerFromTopLeft(tile.x_max - 5, start.bbox_top);
+    var expect = makePlayerFromTopLeft(tile.x_max + 1, start.bbox_top);
+    addUseCase(
+        start,
+        [tile],
+        tried,
+        expect,
+        description
+    );
+
 //*/
     // todo :
-    //  - tester les autres directions (peut être pas refaire tous les tests mais au moins quelques un de pertinents)
-    //  - faire les tests avec xx ou yy qui vaut 0
     //  - tester les déplacements avec des vecteurs > tile_size
     //  - tester avec un player plus large ou haut que tile_size
 
@@ -874,6 +1468,7 @@ function addUseCase(player, collision_tiles, tried_position, expected_position, 
     var final_position = new Position(res.final_pos_arr[0], res.final_pos_arr[1]);
 
     var is_success = _isSamePosition(final_position, expected_position);
+    if (!is_success) _fail_count++;
 
     _drawUseCase(player, collision_tiles, tried_position, expected_position, final_position, is_success, res.tilemap_get_at_pixel_call, description);
 }
@@ -970,7 +1565,7 @@ function Tile(x_min, x_max, y_min, y_max) {
 function findTile(horizontal_nb, vertical_nb) {
     var x_min = horizontal_nb * tile_size;
     var y_min = vertical_nb * tile_size;
-    return new Tile(x_min, x_min + tile_size, y_min, y_min + tile_size);
+    return new Tile(x_min, x_min + tile_size - 1, y_min, y_min + tile_size - 1);
 }
 
 function Position(x, y) {
@@ -992,7 +1587,7 @@ function concatLB(...lines) {
  * @param {(Player|Position)} position2 - The other vector end
  * @returns {number} point_x
  */
-function getXOnVector(point_y, position1, position2) {
+function getXOnSegment(point_y, position1, position2) {
 	if (position1.x == position2.x) return position1.x;
     return position1.x + ( ( (point_y - position1.y) * (position2.x - position1.x) ) / (position2.y - position1.y) );
 }
@@ -1004,8 +1599,8 @@ function getXOnVector(point_y, position1, position2) {
  * @param {(Player|Position)} position2 - The other vector end
  * @returns {number} point_y
  */
-function getYOnVector(point_x, position1, position2) {
-	if (position1.y == position2.y) return position1.x;
+function getYOnSegment(point_x, position1, position2) {
+	if (position1.y == position2.y) return position1.y;
     return position1.y + ( ( (point_x - position1.x) * (position2.y - position1.y) ) / (position2.x - position1.x) );
 }
 
@@ -1164,13 +1759,12 @@ function _drawUseCase(player, collision_tiles, tried_position, expected_position
     var final_is_tried = _isSamePosition(final_player, tried_player);
 
     var players_count = 0;
-    var players_total = 4;
 
     // player start
     players_count++;
     ctx.strokeStyle = _player_color;
     _drawPlayer(ctx, player);
-    _drawPlayerArc(ctx, player, players_count, players_total);
+    _drawPlayerArc(ctx, player, players_count);
 
     // player tried
     players_count++;
@@ -1179,14 +1773,14 @@ function _drawUseCase(player, collision_tiles, tried_position, expected_position
         _drawPathBetweenPlayers(ctx, player, tried_player);
         _drawPlayer(ctx, tried_player);
     }
-    _drawPlayerArc(ctx, tried_player, players_count, players_total);
+    _drawPlayerArc(ctx, tried_player, players_count);
 
     // player expected
     players_count++;
     ctx.strokeStyle = _expected_position_color;
     _drawPathBetweenPlayers(ctx, player, expected_player);
     _drawPlayer(ctx, expected_player);
-    _drawPlayerArc(ctx, expected_player, players_count, players_total);
+    _drawPlayerArc(ctx, expected_player, players_count);
 
     // player end
     players_count++;
@@ -1195,14 +1789,16 @@ function _drawUseCase(player, collision_tiles, tried_position, expected_position
         _drawPathBetweenPlayers(ctx, player, final_player);
         _drawPlayer(ctx, final_player);
     }
-    _drawPlayerArc(ctx, final_player, players_count, players_total);
+    _drawPlayerArc(ctx, final_player, players_count);
 }
 
-function _drawPlayerArc(ctx, player, playerId, maxId) {
-    var arcSize = 2/maxId;
-    var arcStart = (playerId - 1) * arcSize * Math.PI;
+function _drawPlayerArc(ctx, player, playerId) {
+	var parts = 4;
+    var arcSize = 2 / parts;
+    var radius = 2 + Math.ceil(playerId / parts);
+    var arcStart = ( (playerId % parts) + 1 ) * arcSize * Math.PI;
     var arcEnd = arcStart + (arcSize * Math.PI);
-    _drawCircle(ctx, player.x, player.y, 3, arcStart, arcEnd);
+    _drawCircle(ctx, player.x, player.y, radius, arcStart, arcEnd);
 }
 
 function _boundsAddMargin(bounds, mx, my) {
@@ -1385,6 +1981,8 @@ function _start() {
     _drawCaption();
     _clearUseCases();
     test();
+    if (_fail_count > 0) console.log(_fail_count + ' TESTS FAILED');
+    else console.log('100% SUCCESS');
 }
 
 
@@ -1399,8 +1997,9 @@ var _grid_color = '#cbcac9';
 var _coord_font_color = _grid_color;
 var _canvas_size = 350;
 var _paths_alpha = 0.3;
-var _paths_dash = [5, 15];
+var _paths_dash = [];
 var _canvas_margin = 20;
+var _fail_count = 0;
 
 window.onload = _start;
 
