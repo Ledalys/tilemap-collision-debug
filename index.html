@@ -302,12 +302,12 @@ function getValidPosition(x, y, xx, yy, bbox_left, bbox_top, bbox_right, bbox_bo
 		var _next_yside_point_is_defined = false;
 
 		// si tried_bbox_xside ne dépasse pas tried_bbox_xside c'est qu'on ne change pas de tile sur l'axe x donc on a rien a check pour les cotés droit ou gauche
-		if ((_xx > 0 && _next_wall_x <= _tried_bbox_xside) || (_xx < 0 && _next_wall_x >= _tried_bbox_xside)) {
+		if ((_xx > 0 && _next_wall_x <= _tried_bbox_xside) || (_xx < 0 && _next_wall_x + 1 > _tried_bbox_xside)) {
 		    _next_xside_point_x = _next_wall_x;
 			_next_xside_point_y = scr_get_y_on_segment(_next_xside_point_x, _curr_bbox_xside, _curr_bbox_yside, _tried_bbox_xside, _tried_bbox_yside);
 			_next_xside_point_is_defined = true;
 		}
-		if ((_yy > 0 && _next_wall_y <= _tried_bbox_yside) || (_yy < 0 && _next_wall_y >= _tried_bbox_yside)) {
+		if ((_yy > 0 && _next_wall_y <= _tried_bbox_yside) || (_yy < 0 && _next_wall_y + 1 > _tried_bbox_yside)) {
 			_next_yside_point_y = _next_wall_y;
 		    _next_yside_point_x = scr_get_x_on_segment(_next_yside_point_y, _curr_bbox_xside, _curr_bbox_yside, _tried_bbox_xside, _tried_bbox_yside);
 			_next_yside_point_is_defined = true;
