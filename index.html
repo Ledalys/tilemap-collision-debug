@@ -139,169 +139,294 @@ function getValidPosition(x, y, xx, yy, bbox_left, bbox_top, bbox_right, bbox_bo
 	//if (use_case_count === 5) {console.log(next_bottom_point);return;}
 	//if (use_case_count === 5) {console.log(next_bottom_point);}
 
-    var loop_count = 0;
+	var scr_get_x_on_segment = function(...argument) {
+		/// @description scr_get_x_on_segment
+		/// @param {number} y
+		/// @param {number} point1_x
+		/// @param {number} point1_y
+		/// @param {number} point2_x
+		/// @param {number} point2_y
+		/// @returns {number} x
+		/// @see https://math.stackexchange.com/questions/2297518/
 
-    // xside = left or right side
-    // yside = bottom or top side
+		// if point1_x == point2_x return point1_x
+		if (argument[1] == argument[3]) return argument[1];
+		// return point1_x + ( ( (y - point1_y) * (point2_x - point1_x) ) / (point2_y - point1_y) );
+		return argument[1] + ( ( (argument[0] - argument[2]) * (argument[3] - argument[1]) ) / (argument[4] - argument[2]) );
+	}
 
-    var front_bbox_xside, front_bbox_yside, tried_bbox_xside, tried_bbox_yside, next_tile_xdist, next_tile_ydist, xside_sign, yside_sign, xside_offset, yside_offset;
-    if (xx === 0) {
-        // pas de déplacement en x donc on prend un point au hasard
-        front_bbox_xside = bbox_right;
-        next_tile_xdist = tile_size;
-        xside_sign = 1;
-        xside_offset = bbox_right - x;
-    } else if (xx > 0) {
-        // to the right
-        front_bbox_xside = bbox_right;
-        next_tile_xdist = tile_size;
-        xside_sign = 1;
-        xside_offset = bbox_right - x;
-    } else {
-        // to the left
-        front_bbox_xside = bbox_left;
-        next_tile_xdist = -1;
-        xside_sign = -1;
-        xside_offset = x - bbox_left;
-    }
-    tried_bbox_xside = front_bbox_xside + xx;
+	var scr_get_y_on_segment = function(argument0, argument1, argument2, argument3, argument4) {
+		/// @description scr_get_y_on_segment
+		/// @param {number} x
+		/// @param {number} point1_x
+		/// @param {number} point1_y
+		/// @param {number} point2_x
+		/// @param {number} point2_y
+		/// @returns {number} y
+		/// @see https://math.stackexchange.com/questions/2297518/
 
-    if (yy === 0) {
-        // pas de déplacement en y donc on prend un point au hasard
-        front_bbox_yside = bbox_bottom;
-        next_tile_ydist = tile_size;
-        yside_sign = 1;
-        yside_offset = bbox_bottom - y;
-    } else if (yy > 0) {
-        // to the bottom
-        front_bbox_yside = bbox_bottom;
-        next_tile_ydist = tile_size;
-        yside_sign = 1;
-        yside_offset = bbox_bottom - y;
-    } else {
-        // to the top
-        front_bbox_yside = bbox_top;
-        next_tile_ydist = -1;
-        yside_sign = -1;
-        yside_offset = y - bbox_top;
-    }
-    tried_bbox_yside = front_bbox_yside + yy;
+		// if point1_y == point2_y return point1_y
+		if (argument2 == argument4) return argument2;
+		// return point1_y + ( ( (x - point1_x) * (point2_y - point1_y) ) / (point2_x - point1_x) );
+		return argument2 + ( ( (argument0 - argument1) * (argument4 - argument2) ) / (argument3 - argument1) );
+	}
 
-    var start_pos = new Position(front_bbox_xside, front_bbox_yside);
-    var tried_pos = new Position(tried_bbox_xside, tried_bbox_yside);
+	var scr_check_collisions = function(argument0, argument1, argument2, argument3, argument4, argument5, argument6, argument7, argument8, argument9, argument10) {
+		/// @description scr_check_collisions
+		/// The object must use abstr_physical
+		/// @param {number} x
+		/// @param {number} y
+		/// @param {number} xx
+		/// @param {number} yy
+		/// @param {number} bbox_left
+		/// @param {number} bbox_top
+		/// @param {number} bbox_right
+		/// @param {number} bbox_bottom
+		/// @param {number} tile_size
+		/// @param {number} collision_tilemap
+		/// @param {number} collision_tile_id
+		/// @returns {array} [x, y, on_ground, on_wall] 
 
-    // trouve la position la plus proche avant collision
-    var findClosestPosition = function(curr_bbox_xside, curr_bbox_yside) {
-        loop_count++;
+		var _x = argument0;
+		var _y = argument1;
+		var _xx = argument2;
+		var _yy = argument3;
+		var _bbox_left = argument4;
+		var _bbox_top = argument5;
+		var _bbox_right = argument6;
+		var _bbox_bottom = argument7;
+		var _tile_size = argument8;
+		var _collision_tilemap = argument9;
+		var _collision_tile_id = argument10;
 
-        let curr_tile_bbox_left = curr_bbox_xside - (curr_bbox_xside % tile_size);
-        let curr_tile_bbox_top = curr_bbox_yside - (curr_bbox_yside % tile_size);
+		// xside = left or right side
+		// yside = bottom or top side
+		var _front_bbox_xside, _front_bbox_yside,	// bbox sides facing object movement direction
+			_tried_bbox_xside, _tried_bbox_yside,	// bbox of the object at the tried location
+			_next_tile_xdist, _next_tile_ydist,		// distance to got to the next tile for a point on the top left corner of a tile (depending on the object movement direction)
+			_xside_sign, _yside_sign,				// 1 = to the right/bottom, -1 = to the left/top
+			_xside_offset, _yside_offset;			// distance between (x,y) point and the bbox side facing the direction
 
-        // prochaines valeurs de x et y à partir de laquelle le player va entrer dans une nouvelle tile (quand il sera 1 px dans le mur)
-        let next_wall_x = curr_tile_bbox_left + next_tile_xdist;
-        let next_wall_y = curr_tile_bbox_top + next_tile_ydist;
+		if (_xx >= 0) {
+		    // to the right or no horizontal movement
+		    _front_bbox_xside = _bbox_right;
+		    _next_tile_xdist = _tile_size;
+		    _xside_sign = 1;
+		    _xside_offset = _bbox_right - _x;
+		} else {
+		    // to the left
+		    _front_bbox_xside = _bbox_left;
+		    _next_tile_xdist = -1;
+		    _xside_sign = -1;
+		    _xside_offset = _x - _bbox_left;
+		}
+		_tried_bbox_xside = _front_bbox_xside + _xx;
 
-        // les positions (x,y) du coin du joueur quand il sera dans next_wall_x et next_wall_y
-        let next_xside_point, next_yside_point;
+		if (_yy >= 0) {
+		    // to the bottom or no vertical movement
+		    _front_bbox_yside = _bbox_bottom;
+		    _next_tile_ydist = _tile_size;
+		    _yside_sign = 1;
+		    _yside_offset = _bbox_bottom - _y;
+		} else {
+		    // to the top
+		    _front_bbox_yside = _bbox_top;
+		    _next_tile_ydist = -1;
+		    _yside_sign = -1;
+		    _yside_offset = _y - _bbox_top;
+		}
+		_tried_bbox_yside = _front_bbox_yside + _yy;
 
-        // si tried_bbox_xside ne dépasse pas tried_bbox_xside c'est qu'on ne change pas de tile sur l'axe x donc on a rien a check pour les cotés droit ou gauche
-        if ((xx > 0 && next_wall_x < tried_bbox_xside) || (xx < 0 && next_wall_x > tried_bbox_xside)) {
-            next_xside_point = new Position(next_wall_x, getYOnSegment(next_wall_x, start_pos, tried_pos));
-        }
-        if ((yy > 0 && next_wall_y < tried_bbox_yside) || (yy < 0 && next_wall_y > tried_bbox_yside)) {
-            next_yside_point = new Position(getXOnSegment(next_wall_y, start_pos, tried_pos), next_wall_y);
-        }
+		var _closest_corner_position = scr_find_closest_position(
+			_front_bbox_xside, _front_bbox_yside,
+			_tried_bbox_xside, _tried_bbox_yside,
+			_xx, _yy,
+			_next_tile_xdist, _next_tile_ydist,
+			_xside_sign, _yside_sign,
+			_bbox_left, _bbox_top, _bbox_right, _bbox_bottom,
+			_tile_size, _collision_tilemap, _collision_tile_id
+		);
 
-        let next_point, next_safe_point, next_point_side;
-        if (next_xside_point && !next_yside_point) {
-            next_point = next_xside_point;
-            next_point_side = 'xside';
-            next_safe_point = new Position(next_point.x - xside_sign, getYOnSegment(next_point.x - xside_sign, start_pos, tried_pos));
+		return [_closest_corner_position[0] - (_xside_offset * _xside_sign), _closest_corner_position[1] - (_yside_offset * _yside_sign), _closest_corner_position[2], _closest_corner_position[3]];
+	}
 
-        } else if (!next_xside_point && next_yside_point) {
-            next_point = next_yside_point;
-            next_point_side = 'yside';
-            next_safe_point = new Position(getXOnSegment(next_point.y - yside_sign, start_pos, tried_pos), next_point.y - yside_sign);
+	var scr_find_closest_position = function(...argument) {
+		/// @description scr_find_closest_position - Use scr_check_collision
+		/// @param {number} _curr_bbox_xside
+		/// @param {number} _curr_bbox_yside
+		/// @param {number} _tried_bbox_xside
+		/// @param {number} _tried_bbox_yside
+		/// @param {number} _xx
+		/// @param {number} _yy
+		/// @param {number} _next_tile_xdist
+		/// @param {number} _next_tile_ydist
+		/// @param {number} _xside_sign
+		/// @param {number} _yside_sign
+		/// @param {number} _bbox_left
+		/// @param {number} _bbox_top
+		/// @param {number} _bbox_right
+		/// @param {number} _bbox_bottom
+		/// @param {number} _tile_size
+		/// @param {number} _collision_tilemap
+		/// @param {number} _collision_tile_id
+		/// @returns {array} [safe_x, safe_y, on_ground, on_wall] 
+			
+		var _curr_bbox_xside = argument[0];
+		var _curr_bbox_yside = argument[1];
+		var _tried_bbox_xside = argument[2];
+		var _tried_bbox_yside = argument[3];
+		var _xx = argument[4];
+		var _yy = argument[5];
+		var _next_tile_xdist = argument[6];
+		var _next_tile_ydist = argument[7];
+		var _xside_sign = argument[8];
+		var _yside_sign = argument[9];
+		var _bbox_left = argument[10];
+		var _bbox_top = argument[11];
+		var _bbox_right = argument[12];
+		var _bbox_bottom = argument[13];
+		var _tile_size = argument[14];
+		var _collision_tilemap = argument[15];
+		var _collision_tile_id = argument[16];
+			
+		var _curr_tile_bbox_left = _curr_bbox_xside - (_curr_bbox_xside % _tile_size);
+		var _curr_tile_bbox_top = _curr_bbox_yside - (_curr_bbox_yside % _tile_size);
 
-        } else if (next_xside_point && next_yside_point) {
-            // next_point = le point qui est 1 px en dehors de la tile courante
-            // donc on checherche pour chacun des 2 points les coordonnées de la tile adjacente et on regarde si c'est notre tile courante
-            if (next_xside_point.x - next_tile_xdist === curr_tile_bbox_left && next_xside_point.y - (next_xside_point.y % tile_size) === curr_tile_bbox_top) {
-                next_point = next_xside_point;
-                next_point_side = 'xside';
-                next_safe_point = new Position(next_point.x - xside_sign, getYOnSegment(next_point.x - xside_sign, start_pos, tried_pos));
+		// next tiles the object corners will cross
+		var _next_wall_x = _curr_tile_bbox_left + _next_tile_xdist;
+		var _next_wall_y = _curr_tile_bbox_top + _next_tile_ydist;
 
-            } else if (next_yside_point.y - next_tile_ydist === curr_tile_bbox_top && next_yside_point.x - (next_yside_point.x % tile_size) === curr_tile_bbox_left) {
-                next_point = next_yside_point;
-                next_point_side = 'yside';
-                next_safe_point = new Position(getXOnSegment(next_point.y - yside_sign, start_pos, tried_pos), next_point.y - yside_sign);
+		// points where object will enter new tiles
+		var _next_xside_point_x, _next_xside_point_y, _next_yside_point_x, _next_yside_point_y;
+		var _next_xside_point_is_defined = false;
+		var _next_yside_point_is_defined = false;
 
-            } else {
-                // le player est pile dans l'angle de la tile courante
-                // donc les 2 points sont les mêmes
-                next_point = next_xside_point;
-                next_point_side = 'both';
-                next_safe_point = new Position(next_point.x - xside_sign, getYOnSegment(next_point.x - xside_sign, start_pos, tried_pos));
-            }
-        } else {
-            return tried_pos; // on est arrivé au bout sans mur
-        }
+		// si tried_bbox_xside ne dépasse pas tried_bbox_xside c'est qu'on ne change pas de tile sur l'axe x donc on a rien a check pour les cotés droit ou gauche
+		if ((_xx > 0 && _next_wall_x < _tried_bbox_xside) || (_xx < 0 && _next_wall_x > _tried_bbox_xside)) {
+		    _next_xside_point_x = _next_wall_x;
+			_next_xside_point_y = scr_get_y_on_segment(_next_xside_point_x, _curr_bbox_xside, _curr_bbox_yside, _tried_bbox_xside, _tried_bbox_yside);
+			_next_xside_point_is_defined = true;
+		}
+		if ((_yy > 0 && _next_wall_y < _tried_bbox_yside) || (_yy < 0 && _next_wall_y > _tried_bbox_yside)) {
+			_next_yside_point_y = _next_wall_y;
+		    _next_yside_point_x = scr_get_x_on_segment(_next_yside_point_y, _curr_bbox_xside, _curr_bbox_yside, _tried_bbox_xside, _tried_bbox_yside);
+			_next_yside_point_is_defined = true;
+		}
 
-        // check la prochaine tile
-        if (tilemap_get_at_pixel(tilemap, next_point.x, next_point.y)) {
-            // collision = stop à la derniere position safe
-            return next_safe_point;
-        }
+		var _next_point_x, _next_point_y, _next_safe_point_x, _next_safe_point_y, _next_point_side;
 
-        if (next_point_side === 'yside' || next_point_side === 'both') {
-            // on veut passer sur une nouvelle tile en bas ou en haut, on a check le coint principal, mais il faut aussi check l'autre coin sur le même coté car il peut passer sur une tile différente
-            // par exemple si on va vers le bas et qu'on a check le coin bas droit, il faut aussi check le coin bas gauche
-            var other_corner = new Position(
-        		next_point.x + ( (bbox_right - bbox_left) * -xside_sign ),
-        		next_point.y
-    		);
-            var is_same_tile;
-            if (next_point_side === 'yside') {
-            	// plus léger
-            	is_same_tile = curr_tile_bbox_left <= other_corner.x && other_corner.x < curr_tile_bbox_left + tile_size;
-            } else {
-            	var next_point_tile_x = next_point.x - (next_point.x % tile_size);
-            	is_same_tile = next_point_tile_x <= other_corner.x && other_corner.x < next_point_tile_x + tile_size;
-            }
-            if (!is_same_tile) {
-            	// si l'autre coin est dans une tile différente du point déjà testé on check si c'est pas une tile de collision
-	            if (tilemap_get_at_pixel(tilemap, other_corner.x, other_corner.y)) {
-	                return next_safe_point;
-	            }
-            }
-        }
-        if (next_point_side === 'xside' || next_point_side === 'both') {
-            // pareil quand on franchi une tile a droite ou gauche
-            var other_corner = new Position(
-        		next_point.x,
-        		next_point.y + ( (bbox_bottom - bbox_top) * -yside_sign )
-    		);
-            var is_same_tile;
-            if (next_point_side === 'xside') {
-            	// plus léger
-            	is_same_tile = curr_tile_bbox_top <= other_corner.y && other_corner.y < curr_tile_bbox_top + tile_size;
-            } else {
-            	var next_point_tile_y = next_point.y - (next_point.y % tile_size);
-            	is_same_tile = next_point_tile_y <= other_corner.y && other_corner.y < next_point_tile_y + tile_size;
-            }
-            if (!is_same_tile) {
-	            if (tilemap_get_at_pixel(tilemap, other_corner.x, other_corner.y)) {
-	                return next_safe_point;
-	            }
-	        }
-        }
+		if (_next_xside_point_is_defined && !_next_yside_point_is_defined) {
+		    _next_point_x = _next_xside_point_x;
+		    _next_point_y = _next_xside_point_y;
+		    _next_point_side = "xside";
+		    _next_safe_point_x = _next_point_x - _xside_sign;
+			_next_safe_point_y = scr_get_y_on_segment(_next_safe_point_x, _curr_bbox_xside, _curr_bbox_yside, _tried_bbox_xside, _tried_bbox_yside);
 
-        return findClosestPosition(next_point.x, next_point.y);
-    }
+		} else if (!_next_xside_point_is_defined && _next_yside_point_is_defined) {
+		    _next_point_x = _next_yside_point_x;
+		    _next_point_y = _next_yside_point_y;
+		    _next_point_side = "yside";
+			_next_safe_point_y = _next_point_y - _yside_sign;
+		    _next_safe_point_x = scr_get_x_on_segment(_next_safe_point_y, _curr_bbox_xside, _curr_bbox_yside, _tried_bbox_xside, _tried_bbox_yside);
 
-    var last_position = findClosestPosition(front_bbox_xside, front_bbox_yside);
+		} else if (_next_xside_point_is_defined && _next_yside_point_is_defined) {
+		            // next_point = point in an adjacent tile
+		    if (_next_xside_point_x - _next_tile_xdist == _curr_tile_bbox_left && _next_xside_point_y - (_next_xside_point_y % _tile_size) == _curr_tile_bbox_top) {
+				_next_point_x = _next_xside_point_x;
+				_next_point_y = _next_xside_point_y;
+				_next_point_side = "xside";
+				_next_safe_point_x = _next_point_x - _xside_sign;
+				_next_safe_point_y = scr_get_y_on_segment(_next_safe_point_x, _curr_bbox_xside, _curr_bbox_yside, _tried_bbox_xside, _tried_bbox_yside);
 
-    return [last_position.x - (xside_offset * xside_sign), last_position.y - (yside_offset * yside_sign)];
+		    } else if (_next_yside_point_y - _next_tile_ydist == _curr_tile_bbox_top && _next_yside_point_x - (_next_yside_point_x % _tile_size) == _curr_tile_bbox_left) {
+			    _next_point_x = _next_yside_point_x;
+			    _next_point_y = _next_yside_point_y;
+			    _next_point_side = "yside";
+				_next_safe_point_y = _next_point_y - _yside_sign;
+			    _next_safe_point_x = scr_get_x_on_segment(_next_safe_point_y, _curr_bbox_xside, _curr_bbox_yside, _tried_bbox_xside, _tried_bbox_yside);
+
+		    } else {
+				// no adjacent tile = diagonal tile = next_xside_point and next_yside_point are equal
+				_next_point_x = _next_xside_point_x;
+				_next_point_y = _next_xside_point_y;
+				_next_point_side = "both";
+				_next_safe_point_x = _next_point_x - _xside_sign;
+				_next_safe_point_y = scr_get_y_on_segment(_next_safe_point_x, _curr_bbox_xside, _curr_bbox_yside, _tried_bbox_xside, _tried_bbox_yside);
+		    }
+			
+		} else {
+			// no collision + tried position reached
+			return [_tried_bbox_xside, _tried_bbox_yside, false, false];
+		}
+
+		// check main corner collision
+		if (tilemap_get_at_pixel(_collision_tilemap, _next_point_x, _next_point_y) == _collision_tile_id) {
+		    // collision = stop at safe position
+			
+			var _on_wall = _next_point_side == "xside" || _next_point_side == "both" ? true : false;
+		    
+			return [_next_safe_point_x, _next_safe_point_y, !_on_wall, _on_wall];
+		}
+
+		var _is_same_tile;
+		// check other corners
+		if (_next_point_side == "yside" || _next_point_side == "both") {
+			var _other_corner_x = _next_point_x + ( (_bbox_right - _bbox_left) * -_xside_sign );
+			var _other_corner_y = _next_point_y;
+			_is_same_tile = false;
+		    if (_next_point_side == "yside") {
+		        // lighter
+		        _is_same_tile = _curr_tile_bbox_left <= _other_corner_x && _other_corner_x < _curr_tile_bbox_left + _tile_size;
+		    } else {
+		        var _next_point_tile_x = _next_point_x - (_next_point_x % _tile_size);
+		        _is_same_tile = _next_point_tile_x <= _other_corner_x && _other_corner_x < _next_point_tile_x + _tile_size;
+		    }
+		    if (!_is_same_tile) {
+			    if (tilemap_get_at_pixel(_collision_tilemap, _other_corner_x, _other_corner_y) == _collision_tile_id) {
+				    // collision = stop at safe position
+				    return [_next_safe_point_x, _next_safe_point_y, _next_point_side == "yside", _next_point_side == "both"];
+			    }
+		    }
+		}
+
+		 if (_next_point_side == "xside" || _next_point_side == "both") {
+			var _other_corner_x = _next_point_x;
+			var _other_corner_y = _next_point_y + ( (_bbox_bottom - _bbox_top) * -_yside_sign );
+			_is_same_tile = false;
+			if (_next_point_side == "xside") {
+		        // lighter
+		        _is_same_tile = _curr_tile_bbox_top <= _other_corner_y && _other_corner_y < _curr_tile_bbox_top + _tile_size;
+		    } else {
+		        var _next_point_tile_y = _next_point_y - (_next_point_y % _tile_size);
+		        _is_same_tile = _next_point_tile_y <= _other_corner_y && _other_corner_y < _next_point_tile_y + _tile_size;
+		    }
+		    if (!_is_same_tile) {
+			    if (tilemap_get_at_pixel(_collision_tilemap, _other_corner_x, _other_corner_y) == _collision_tile_id) {
+				    // collision = stop at safe position
+				    return [_next_safe_point_x, _next_safe_point_y, false, true];
+			    }
+			}
+		}
+
+		return scr_find_closest_position(
+			_next_point_x, _next_point_y,
+			argument[2], argument[3], argument[4], argument[5], argument[6], argument[7], argument[8], argument[9],
+			argument[10], argument[11], argument[12], argument[13], argument[14], argument[15], argument[16]);
+
+	}
+
+	var new_pos = scr_check_collisions(
+		x, y,
+		xx, yy,
+		bbox_left, bbox_top, bbox_right, bbox_bottom,
+		tile_size, tilemap, 1
+	);
+	x = new_pos[0];
+	y = new_pos[1];
+	on_ground = new_pos[2];
+	on_wall = new_pos[3];
+
+	return [x, y];
 }
 
 /**
