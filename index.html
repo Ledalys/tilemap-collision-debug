@@ -110,6 +110,8 @@
 
 var tile_size = 64;
 var tilemap = 'Collisions'; // just to get a parameter like the GML tilemap_get_at_pixel function
+var room_width = 10000;
+var room_height = 10000;
 
 var zoom = 0; // 0 = default, 2 = zoom, -2 = unzoom (from -infinite to +infinite, float allowed)
 var use_case_count = 0; // the use case number for debug purpose
@@ -133,11 +135,21 @@ var use_case_count = 0; // the use case number for debug purpose
  *     Return value is 1 if there is a tile at these coordinates else 0.
  * @returns {number[]} - Valid new position after collision check. Like this : [valid_x, valid_y]
  */
-function getValidPosition(x, y, xx, yy, bbox_left, bbox_top, bbox_right, bbox_bottom, tilemap_get_at_pixel, tile_size) {
+function getValidPosition(x, y, xx, yy, bbox_left, bbox_top, bbox_right, bbox_bottom, tilemap_get_at_pixel, tile_size, room_width, room_height) {
 
 	//return [x+xx, y+yy]
 	//if (use_case_count === 5) {console.log(next_bottom_point);return;}
 	//if (use_case_count === 5) {console.log(next_bottom_point);}
+
+	/**
+	 * [JS ONLY]
+	 * native gamemaker function
+	 */
+	var clamp = function(val, min, max) {
+		if (val < min) return min;
+		if (val > max) return max;
+		return val;
+	}
 
 	var scr_get_x_on_segment = function(...argument) {
 		/// @description scr_get_x_on_segment
@@ -171,8 +183,8 @@ function getValidPosition(x, y, xx, yy, bbox_left, bbox_top, bbox_right, bbox_bo
 		return argument2 + ( ( (argument0 - argument1) * (argument4 - argument2) ) / (argument3 - argument1) );
 	}
 
-	var scr_check_collisions = function(argument0, argument1, argument2, argument3, argument4, argument5, argument6, argument7, argument8, argument9, argument10) {
-		/// @description scr_check_collisions
+	var scr_find_closest_valid_position = function(argument0, argument1, argument2, argument3, argument4, argument5, argument6, argument7, argument8, argument9, argument10) {
+		/// @description scr_find_closest_valid_position
 		/// The object must use abstr_physical
 		/// @param {number} x
 		/// @param {number} y
@@ -185,7 +197,7 @@ function getValidPosition(x, y, xx, yy, bbox_left, bbox_top, bbox_right, bbox_bo
 		/// @param {number} tile_size
 		/// @param {number} collision_tilemap
 		/// @param {number} collision_tile_id
-		/// @returns {array} [x, y, on_ground, on_wall] 
+		/// @returns {array} [x, y, on_ground_or_roof, on_wall] 
 
 		var _x = argument0;
 		var _y = argument1;
@@ -220,7 +232,7 @@ function getValidPosition(x, y, xx, yy, bbox_left, bbox_top, bbox_right, bbox_bo
 		    _xside_sign = -1;
 		    _xside_offset = _x - _bbox_left;
 		}
-		_tried_bbox_xside = _front_bbox_xside + _xx;
+		_tried_bbox_xside = clamp(_front_bbox_xside + _xx, 0, room_width - 1);
 
 		if (_yy >= 0) {
 		    // to the bottom or no vertical movement
@@ -235,9 +247,9 @@ function getValidPosition(x, y, xx, yy, bbox_left, bbox_top, bbox_right, bbox_bo
 		    _yside_sign = -1;
 		    _yside_offset = _y - _bbox_top;
 		}
-		_tried_bbox_yside = _front_bbox_yside + _yy;
+		_tried_bbox_yside = clamp(_front_bbox_yside + _yy, 0, room_height - 1);
 
-		var _closest_corner_position = scr_find_closest_position(
+		var _closest_corner_position = _scr_find_closest_valid_corner_position(
 			_front_bbox_xside, _front_bbox_yside,
 			_tried_bbox_xside, _tried_bbox_yside,
 			_xx, _yy,
@@ -250,8 +262,8 @@ function getValidPosition(x, y, xx, yy, bbox_left, bbox_top, bbox_right, bbox_bo
 		return [_closest_corner_position[0] - (_xside_offset * _xside_sign), _closest_corner_position[1] - (_yside_offset * _yside_sign), _closest_corner_position[2], _closest_corner_position[3]];
 	}
 
-	var scr_find_closest_position = function(...argument) {
-		/// @description scr_find_closest_position - Use scr_check_collision
+	var _scr_find_closest_valid_corner_position = function(...argument) {
+		/// @description _scr_find_closest_valid_corner_position - Use scr_check_collision
 		/// @param {number} _curr_bbox_xside
 		/// @param {number} _curr_bbox_yside
 		/// @param {number} _tried_bbox_xside
@@ -269,7 +281,7 @@ function getValidPosition(x, y, xx, yy, bbox_left, bbox_top, bbox_right, bbox_bo
 		/// @param {number} _tile_size
 		/// @param {number} _collision_tilemap
 		/// @param {number} _collision_tile_id
-		/// @returns {array} [safe_x, safe_y, on_ground, on_wall] 
+		/// @returns {array} [safe_x, safe_y, on_ground_or_roof, on_wall] 
 			
 		var _curr_bbox_xside = argument[0];
 		var _curr_bbox_yside = argument[1];
@@ -301,13 +313,14 @@ function getValidPosition(x, y, xx, yy, bbox_left, bbox_top, bbox_right, bbox_bo
 		var _next_xside_point_is_defined = false;
 		var _next_yside_point_is_defined = false;
 
-		// si tried_bbox_xside ne dépasse pas tried_bbox_xside c'est qu'on ne change pas de tile sur l'axe x donc on a rien a check pour les cotés droit ou gauche
-		if ((_xx > 0 && _next_wall_x <= _tried_bbox_xside) || (_xx < 0 && _next_wall_x + 1 > _tried_bbox_xside)) {
+		// si tried_bbox_xside ne dépasse pas next_wall_x c'est qu'on ne change pas de tile sur l'axe x donc on a rien a check pour les cotés droit ou gauche
+		if ((_xx > 0 && _next_wall_x - 1 < _tried_bbox_xside) || (_xx < 0 && _next_wall_x + 1 > _tried_bbox_xside)) {
 		    _next_xside_point_x = _next_wall_x;
 			_next_xside_point_y = scr_get_y_on_segment(_next_xside_point_x, _curr_bbox_xside, _curr_bbox_yside, _tried_bbox_xside, _tried_bbox_yside);
 			_next_xside_point_is_defined = true;
 		}
-		if ((_yy > 0 && _next_wall_y <= _tried_bbox_yside) || (_yy < 0 && _next_wall_y + 1 > _tried_bbox_yside)) {
+
+		if ((_yy > 0 && _next_wall_y - 1 < _tried_bbox_yside) || (_yy < 0 && _next_wall_y + 1 > _tried_bbox_yside)) {
 			_next_yside_point_y = _next_wall_y;
 		    _next_yside_point_x = scr_get_x_on_segment(_next_yside_point_y, _curr_bbox_xside, _curr_bbox_yside, _tried_bbox_xside, _tried_bbox_yside);
 			_next_yside_point_is_defined = true;
@@ -408,14 +421,13 @@ function getValidPosition(x, y, xx, yy, bbox_left, bbox_top, bbox_right, bbox_bo
 			}
 		}
 
-		return scr_find_closest_position(
+		return _scr_find_closest_valid_corner_position(
 			_next_point_x, _next_point_y,
 			argument[2], argument[3], argument[4], argument[5], argument[6], argument[7], argument[8], argument[9],
 			argument[10], argument[11], argument[12], argument[13], argument[14], argument[15], argument[16]);
-
 	}
 
-	var new_pos = scr_check_collisions(
+	var new_pos = scr_find_closest_valid_position(
 		x, y,
 		xx, yy,
 		bbox_left, bbox_top, bbox_right, bbox_bottom,
@@ -1427,6 +1439,21 @@ function test() {
         description
     );
 
+    var description = concatLB(descr_direction, '1 tile to 2 tiles');
+    description = concatLB(description, '1px yy');
+
+    var tile = findTile(2,2);
+    var start = makePlayerFromBottomLeft(tile.x_min + 10, tile.y_min - 1);
+    var tried = makePlayerFromBottomLeft(start.bbox_left, tile.y_min);
+    var expect = start;
+    addUseCase(
+        start,
+        [tile],
+        tried,
+        expect,
+        description
+    );
+
     ///////// DIRECTION = RIGHT ONLY
     var descr_direction = 'to right only';
 
@@ -1553,18 +1580,6 @@ function test() {
     var start = makePlayerFromTopLeft(tile.x_max + 5, tile.y_max - 10);
     var tried = makePlayerFromTopLeft(tile.x_max - 5, start.bbox_top);
     var expect = makePlayerFromTopLeft(tile.x_max + 1, start.bbox_top);
-    addUseCase(
-        start,
-        [tile],
-        tried,
-        expect,
-        description
-    );
-
-    var tile = findTile(2,2);
-    var start = makePlayerFromBottomLeft(tile.x_min + 10, tile.y_min - 1);
-    var tried = makePlayerFromBottomLeft(start.bbox_left, tile.y_min);
-    var expect = start;
     addUseCase(
         start,
         [tile],
@@ -1777,7 +1792,7 @@ function _testScript(player, collision_tiles, tried_position) {
         });
         return res ? res.id : 0;
     }
-    var final_pos_arr = getValidPosition(player.x, player.y, tried_position.x - player.x, tried_position.y - player.y, player.bbox_left, player.bbox_top, player.bbox_right, player.bbox_bottom, tilemap_get_at_pixel, tile_size);
+    var final_pos_arr = getValidPosition(player.x, player.y, tried_position.x - player.x, tried_position.y - player.y, player.bbox_left, player.bbox_top, player.bbox_right, player.bbox_bottom, tilemap_get_at_pixel, tile_size, room_width, room_height);
     return {final_pos_arr: final_pos_arr, tilemap_get_at_pixel_call: tilemap_get_at_pixel_call};
 }
 
