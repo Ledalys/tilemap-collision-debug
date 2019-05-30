@@ -151,7 +151,7 @@ function getValidPosition(x, y, xx, yy, bbox_left, bbox_top, bbox_right, bbox_bo
 		return val;
 	}
 
-	var scr_get_x_on_segment = function(...argument) {
+	var scr_get_x_on_segment = function(argument0, argument1, argument2, argument3, argument4) {
 		/// @description scr_get_x_on_segment
 		/// @param {number} y
 		/// @param {number} point1_x
@@ -162,9 +162,9 @@ function getValidPosition(x, y, xx, yy, bbox_left, bbox_top, bbox_right, bbox_bo
 		/// @see https://math.stackexchange.com/questions/2297518/
 
 		// if point1_x == point2_x return point1_x
-		if (argument[1] == argument[3]) return argument[1];
+		if (argument1 == argument3) return argument1;
 		// return point1_x + ( ( (y - point1_y) * (point2_x - point1_x) ) / (point2_y - point1_y) );
-		return argument[1] + ( ( (argument[0] - argument[2]) * (argument[3] - argument[1]) ) / (argument[4] - argument[2]) );
+		return argument1 + ( ( (argument0 - argument2) * (argument3 - argument1) ) / (argument4 - argument2) );
 	}
 
 	var scr_get_y_on_segment = function(argument0, argument1, argument2, argument3, argument4) {
